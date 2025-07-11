@@ -63,9 +63,28 @@
             opacity: 0; 
             transition: opacity 0.3s ease; 
             z-index: 1000;
+            cursor: pointer;
         }
         .sync-indicator.show { opacity: 1; }
         .sync-indicator.error { background: #f8d7da; color: #721c24; }
+        .sync-indicator.success { background: #d4edda; color: #155724; }
+        .sync-indicator.local-only { background: #fff3cd; color: #856404; }
+        
+        .debug-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-family: monospace;
+            max-width: 300px;
+            z-index: 1000;
+            display: none;
+        }
+        .debug-panel.show { display: block; }
     </style>
 </head>
 <body>
@@ -104,7 +123,17 @@
         <div class="tasks" id="taskList"></div>
     </div>
 
-    <div class="sync-indicator" id="syncIndicator"></div>
+    <div class="sync-indicator" id="syncIndicator" onclick="toggleDebugPanel()"></div>
+    <div class="debug-panel" id="debugPanel">
+        <div><strong>デバッグ情報</strong></div>
+        <div>User ID: <span id="debugUserId">-</span></div>
+        <div>Supabase接続: <span id="debugSupabase">-</span></div>
+        <div>ローカルタスク数: <span id="debugLocalTasks">0</span></div>
+        <div>同期待ちタスク: <span id="debugPendingSync">0</span></div>
+        <div>最終同期: <span id="debugLastSync">-</span></div>
+        <button onclick="forceSync()" style="margin-top: 5px; padding: 2px 8px; font-size: 10px;">強制同期</button>
+        <button onclick="clearLocalData()" style="margin-top: 2px; padding: 2px 8px; font-size: 10px; background: #dc3545; color: white; border: none;">ローカル削除</button>
+    </div>
 
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script>
@@ -112,6 +141,7 @@
         
         // Supabase設定
         let supabase = null;
+        let currentUser = null;
         
         try {
             const SUPABASE_URL = 'https://hsekpmpboawozvuwscf.supabase.co';
@@ -120,17 +150,67 @@
             if (window.supabase && window.supabase.createClient) {
                 supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
                 console.log('Supabase初期化成功');
+                
+                // 認証状態の監視
+                supabase.auth.onAuthStateChange((event, session) => {
+                    currentUser = session?.user || null;
+                    if (currentUser) {
+                        userId = currentUser.id;
+                        console.log('ユーザーログイン:', userId);
+                        loadTasks();
+                    } else {
+                        console.log('ユーザーログアウト');
+                        signInAnonymously();
+                    }
+                });
+                
+                // 初期認証確認
+                supabase.auth.getSession().then(({ data: { session } }) => {
+                    currentUser = session?.user || null;
+                    if (currentUser) {
+                        userId = currentUser.id;
+                        console.log('既存セッション:', userId);
+                    } else {
+                        signInAnonymously();
+                    }
+                });
+                
             } else {
                 console.warn('Supabaseライブラリが読み込まれていません');
             }
         } catch (error) {
             console.error('Supabase初期化エラー:', error);
         }
+        
+        // 匿名ログイン
+        async function signInAnonymously() {
+            if (!supabase) return;
+            
+            try {
+                // 既存の匿名セッションがあるかチェック
+                let storedAnonId = localStorage.getItem('todo_anon_user_id');
+                
+                if (!storedAnonId) {
+                    // 新しい匿名ユーザーIDを生成
+                    storedAnonId = 'anon_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                    localStorage.setItem('todo_anon_user_id', storedAnonId);
+                }
+                
+                userId = storedAnonId;
+                console.log('匿名ユーザーID:', userId);
+                loadTasks();
+                
+            } catch (error) {
+                console.error('匿名ログインエラー:', error);
+                userId = generateUserId(); // フォールバック
+                loadTasks();
+            }
+        }
 
         // アプリケーション状態
         let tasks = [];
         let currentFilter = 'all';
-        let userId = localStorage.getItem('todo_user_id') || generateUserId();
+        let userId = null; // Supabase認証後に設定
         let draggedTaskIndex = null;
         let pendingSync = new Set();
         let syncTimer = null;
@@ -147,20 +227,63 @@
             return id;
         }
 
-        function showSyncIndicator(message, isError = false) {
+        function showSyncIndicator(message, isError = false, isSuccess = false, isLocalOnly = false) {
             const indicator = document.getElementById('syncIndicator');
             if (indicator) {
                 indicator.textContent = message;
-                indicator.className = `sync-indicator show ${isError ? 'error' : ''}`;
+                let className = 'sync-indicator show';
+                if (isError) className += ' error';
+                else if (isSuccess) className += ' success';
+                else if (isLocalOnly) className += ' local-only';
+                
+                indicator.className = className;
                 setTimeout(() => {
                     indicator.classList.remove('show');
-                }, 2000);
+                }, 3000);
+            }
+            updateDebugInfo();
+        }
+        
+        function updateDebugInfo() {
+            document.getElementById('debugUserId').textContent = userId || '-';
+            document.getElementById('debugSupabase').textContent = supabase ? '✓接続' : '✗未接続';
+            document.getElementById('debugLocalTasks').textContent = tasks.length;
+            document.getElementById('debugPendingSync').textContent = pendingSync.size;
+            document.getElementById('debugLastSync').textContent = new Date().toLocaleTimeString();
+        }
+        
+        function toggleDebugPanel() {
+            const panel = document.getElementById('debugPanel');
+            panel.classList.toggle('show');
+            updateDebugInfo();
+        }
+        
+        async function forceSync() {
+            showSyncIndicator('強制同期中...');
+            await performBatchSync();
+        }
+        
+        function clearLocalData() {
+            if (confirm('ローカルデータを削除しますか？')) {
+                if (userId) {
+                    localStorage.removeItem('taskflow_tasks_' + userId);
+                }
+                localStorage.removeItem('todo_anon_user_id');
+                tasks = [];
+                renderTasks();
+                showSyncIndicator('ローカルデータ削除完了', false, false, true);
+                location.reload();
             }
         }
 
         async function loadTasks() {
+            if (!userId) {
+                console.log('userIdが設定されていません。スキップ');
+                return;
+            }
+            
             try {
-                console.log('データ読み込み開始');
+                console.log('データ読み込み開始, userId:', userId);
                 
                 // ローカルストレージから即座に読み込み
                 const localTasks = localStorage.getItem('taskflow_tasks_' + userId);
@@ -172,6 +295,7 @@
 
                 // Supabaseが利用可能な場合のみクラウド同期
                 if (supabase) {
+                    console.log('Supabaseからデータを取得中...');
                     const { data, error } = await supabase
                         .from('tasks')
                         .select('*')
@@ -180,7 +304,14 @@
 
                     if (error) {
                         console.error('Supabase読み込みエラー:', error);
-                        showSyncIndicator('同期エラー', true);
+                        
+                        // テーブルが存在しない場合は作成を試行
+                        if (error.code === 'PGRST116' || error.message.includes('relation "tasks" does not exist')) {
+                            console.log('tasksテーブルが存在しません。作成を試行...');
+                            await createTasksTable();
+                        } else {
+                            showSyncIndicator('同期エラー', true);
+                        }
                     } else if (data && data.length > 0) {
                         console.log('Supabaseデータ読み込み:', data.length, '件');
                         tasks = data.map(item => ({
@@ -193,12 +324,37 @@
                         }));
                         renderTasks();
                         localStorage.setItem('taskflow_tasks_' + userId, JSON.stringify(tasks));
+                        showSyncIndicator('Supabase同期完了', false, true);
+                    } else {
+                        console.log('Supabaseにデータがありません');
                     }
                 }
                 console.log('データ読み込み完了');
             } catch (error) {
                 console.error('loadTasks エラー:', error);
                 showSyncIndicator('同期エラー', true);
+            }
+        }
+        
+        // tasksテーブル作成関数
+        async function createTasksTable() {
+            if (!supabase) return;
+            
+            try {
+                console.log('tasksテーブル作成を試行...');
+                // RPC呼び出しでSQLを実行
+                const { data, error } = await supabase.rpc('create_tasks_table');
+                
+                if (error) {
+                    console.error('テーブル作成エラー:', error);
+                    showSyncIndicator('テーブル作成失敗', true);
+                } else {
+                    console.log('tasksテーブル作成成功');
+                    showSyncIndicator('テーブル作成完了');
+                }
+            } catch (error) {
+                console.error('テーブル作成エラー:', error);
+                showSyncIndicator('テーブル作成失敗', true);
             }
         }
 
@@ -213,9 +369,15 @@
         }
 
         async function performBatchSync() {
+            if (!userId) {
+                console.log('userIdが設定されていません。同期をスキップ');
+                return;
+            }
+            
             if (!supabase) {
                 localStorage.setItem('taskflow_tasks_' + userId, JSON.stringify(tasks));
                 pendingSync.clear();
+                showSyncIndicator('ローカル保存のみ', false, false, true);
                 return;
             }
 
@@ -236,6 +398,7 @@
                 }).filter(Boolean);
 
                 if (updates.length > 0) {
+                    console.log('Supabaseに同期中:', updates.length, '件');
                     const { error } = await supabase
                         .from('tasks')
                         .upsert(updates, { onConflict: 'id' });
@@ -245,7 +408,7 @@
                         showSyncIndicator('同期エラー', true);
                     } else {
                         console.log('Supabase保存成功:', updates.length, '件');
-                        showSyncIndicator('同期完了');
+                        showSyncIndicator('Supabase同期完了', false, true);
                     }
                 }
                 
@@ -260,6 +423,11 @@
 
         async function addTask() {
             console.log('addTask 関数実行');
+            
+            if (!userId) {
+                console.error('userIdが設定されていません');
+                return;
+            }
             
             const input = document.getElementById('newTask');
             if (!input) {
@@ -320,6 +488,11 @@
 
         async function deleteTask(id) {
             console.log('タスク削除:', id);
+            
+            if (!userId) {
+                console.error('userIdが設定されていません');
+                return;
+            }
             
             tasks = tasks.filter(t => t.id !== id);
             renderTasks();
@@ -384,7 +557,18 @@
             });
         }
 
-        function editTaskName(id) {
+        function editTaskName(id, event) {
+            // タッチイベントやドラッグ中は編集を無効化
+            if (isTouching || draggedTaskIndex !== null) {
+                return;
+            }
+            
+            // イベントの伝播を停止してドラッグイベントとの干渉を防ぐ
+            if (event) {
+                event.stopPropagation();
+                event.preventDefault();
+            }
+            
             const task = tasks.find(t => t.id === id);
             const taskElement = document.querySelector(`[data-task-id="${id}"] .task-text`);
             
@@ -393,15 +577,30 @@
                 return;
             }
             
+            // 既に編集中の場合は何もしない
+            if (taskElement.classList.contains('editing')) {
+                return;
+            }
+            
             taskElement.contentEditable = true;
             taskElement.classList.add('editing');
-            taskElement.focus();
             
-            const range = document.createRange();
-            range.selectNodeContents(taskElement);
-            const selection = window.getSelection();
-            selection.removeAllRanges();
-            selection.addRange(range);
+            // モバイルでのフォーカス処理を改善
+            setTimeout(() => {
+                taskElement.focus();
+                
+                // テキスト選択（モバイル対応）
+                if (window.getSelection && document.createRange) {
+                    const range = document.createRange();
+                    range.selectNodeContents(taskElement);
+                    const selection = window.getSelection();
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                } else if (taskElement.setSelectionRange) {
+                    // フォールバック
+                    taskElement.setSelectionRange(0, taskElement.textContent.length);
+                }
+            }, 100);
             
             function finishEdit() {
                 const newText = taskElement.textContent.trim();
@@ -416,8 +615,14 @@
                 renderTasks();
             }
             
-            taskElement.addEventListener('blur', finishEdit, { once: true });
-            taskElement.addEventListener('keydown', (e) => {
+            // イベントリスナーを一度だけ追加
+            const blurHandler = () => {
+                finishEdit();
+                taskElement.removeEventListener('blur', blurHandler);
+            };
+            
+            const keyHandler = (e) => {
+                e.stopPropagation(); // キーイベントの伝播を停止
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     taskElement.blur();
@@ -425,7 +630,11 @@
                     taskElement.textContent = task.text;
                     taskElement.blur();
                 }
-            }, { once: true });
+                taskElement.removeEventListener('keydown', keyHandler);
+            };
+            
+            taskElement.addEventListener('blur', blurHandler);
+            taskElement.addEventListener('keydown', keyHandler);
         }
 
         // ドラッグ&ドロップ処理（PC + スマホ対応）
@@ -612,7 +821,7 @@
                      ontouchend="handleTouchEnd(event)">
                     <div class="task-status ${task.status}"></div>
                     <div class="task-content">
-                        <div class="task-text" onclick="editTaskName(${task.id})" title="クリックして編集">${task.text}</div>
+                        <div class="task-text" onclick="editTaskName(${task.id}, event)" title="クリックして編集">${task.text}</div>
                     </div>
                     <div class="task-actions">
                         ${getTaskActions(task)}
@@ -657,9 +866,15 @@
                 console.error('newTask要素が見つかりません');
             }
             
-            // 初期化
+            // Supabase初期化完了まで少し待機してから初期化
             console.log('初期化開始');
-            loadTasks();
+            setTimeout(() => {
+                if (!userId) {
+                    // userIdが設定されていない場合はフォールバック
+                    userId = localStorage.getItem('todo_anon_user_id') || generateUserId();
+                }
+                loadTasks();
+            }, 100);
         });
 
         window.addEventListener('beforeunload', () => {
