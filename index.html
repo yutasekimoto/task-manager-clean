@@ -88,13 +88,30 @@
             display: none;
         }
         .debug-panel.show { display: block; }
+        
+        .touch-debug {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255,0,0,0.9);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            font-size: 14px;
+            font-family: monospace;
+            z-index: 2000;
+            max-width: 90%;
+            text-align: center;
+            display: none;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>To Do</h1>
-            <div class="version">v2025.1.18-Debug</div>
+            <div class="version">v2025.1.19</div>
         </div>
 
         <div class="stats">
@@ -137,10 +154,15 @@
         <button onclick="forceSync()" style="margin-top: 5px; padding: 2px 8px; font-size: 10px;">強制同期</button>
         <button onclick="clearLocalData()" style="margin-top: 2px; padding: 2px 8px; font-size: 10px; background: #dc3545; color: white; border: none;">ローカル削除</button>
     </div>
+    
+    <div class="touch-debug" id="touchDebug">
+        <div id="touchDebugContent">タッチデバッグ</div>
+        <button onclick="hideTouchDebug()" style="margin-top: 10px; padding: 5px 15px;">閉じる</button>
+    </div>
 
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script>
-        console.log('ToDoアプリ ver.2025.1.18-Debug 開始');
+        console.log('ToDoアプリ ver.2025.1.19 開始');
         
         // Supabase設定
         let supabase = null;
@@ -281,6 +303,32 @@
                 showSyncIndicator('ローカルデータ削除完了', false, false, true);
                 location.reload();
             }
+        }
+        
+        let debugMessages = [];
+        
+        function showTouchDebug(message) {
+            debugMessages.push(new Date().toLocaleTimeString() + ': ' + message);
+            if (debugMessages.length > 10) debugMessages.shift();
+            
+            const debugContent = document.getElementById('touchDebugContent');
+            const debugDiv = document.getElementById('touchDebug');
+            
+            if (debugContent && debugDiv) {
+                debugContent.innerHTML = debugMessages.join('<br>');
+                debugDiv.style.display = 'block';
+                
+                // 3秒後に自動で閉じる
+                setTimeout(() => {
+                    if (debugDiv.style.display === 'block') {
+                        debugDiv.style.display = 'none';
+                    }
+                }, 3000);
+            }
+        }
+        
+        function hideTouchDebug() {
+            document.getElementById('touchDebug').style.display = 'none';
         }
 
         async function loadTasks() {
@@ -693,10 +741,12 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
 
         function handleTouchStart(e, index) {
             console.log('handleTouchStart:', index, 'target:', e.target.className);
+            showTouchDebug(`TouchStart: ${index} target: ${e.target.className}`);
             
             // アクションボタンやタスクテキストへのタッチの場合はドラッグを無効化
             if (e.target.closest('.task-actions') || e.target.closest('.task-text')) {
                 console.log('タッチ無効化: アクションまたはテキスト');
+                showTouchDebug('タッチ無効化: アクションまたはテキスト');
                 return;
             }
             
@@ -706,6 +756,7 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
             touchCurrentY = touchStartY;
             
             console.log('ドラッグ開始:', index, 'Y:', touchStartY);
+            showTouchDebug(`ドラッグ開始: ${index} Y: ${touchStartY}`);
             
             const taskElement = e.target.closest('.task');
             if (taskElement) {
@@ -714,6 +765,7 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                 navigator.vibrate && navigator.vibrate(50); // 振動フィードバック
                 e.preventDefault();
                 console.log('ドラッグ要素準備完了');
+                showTouchDebug('ドラッグ要素準備完了');
             }
         }
 
@@ -742,6 +794,7 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
 
         function handleTouchEnd(e) {
             console.log('handleTouchEnd: isTouching=', isTouching, 'draggedTaskIndex=', draggedTaskIndex);
+            showTouchDebug(`TouchEnd: isTouching=${isTouching} index=${draggedTaskIndex}`);
             
             if (!isTouching) return;
             
@@ -753,6 +806,7 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                 
                 const moveDistance = touchCurrentY - touchStartY;
                 console.log('移動距離:', moveDistance);
+                showTouchDebug(`移動距離: ${moveDistance}`);
                 
                 // より感度の良いドロップ処理
                 if (Math.abs(moveDistance) > 20) {
@@ -762,16 +816,20 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                     const newIndex = Math.max(0, Math.min(filteredTasks.length - 1, draggedTaskIndex + moveSteps));
                     
                     console.log('計算結果: moveSteps=', moveSteps, 'newIndex=', newIndex, 'filteredTasks.length=', filteredTasks.length);
+                    showTouchDebug(`移動: ${draggedTaskIndex}→${newIndex} steps:${moveSteps}`);
                     
                     if (newIndex !== draggedTaskIndex) {
                         console.log('タッチでの並び替え実行:', draggedTaskIndex, '→', newIndex);
+                        showTouchDebug('並び替え実行!');
                         handleDropLogic(draggedTaskIndex, newIndex);
                         navigator.vibrate && navigator.vibrate(100); // 成功時の振動フィードバック
                     } else {
                         console.log('並び替えなし: 同じインデックス');
+                        showTouchDebug('並び替えなし: 同じインデックス');
                     }
                 } else {
                     console.log('移動距離不足:', Math.abs(moveDistance));
+                    showTouchDebug(`移動距離不足: ${Math.abs(moveDistance)}`);
                 }
                 
                 // ドラッグ状態をクリア
