@@ -6,6 +6,9 @@
     <title>To Do管理</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="To Do管理">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: linear-gradient(135deg, #2d5a27 0%, #1e3f1a 100%); min-height: 100vh; padding: 20px; }
@@ -91,7 +94,7 @@
     <div class="container">
         <div class="header">
             <h1>To Do</h1>
-            <div class="version">v2025.1.10</div>
+            <div class="version">v2025.1.14</div>
         </div>
 
         <div class="stats">
@@ -137,17 +140,17 @@
 
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script>
-        console.log('ToDoアプリ ver.2025.1.10 開始');
+        console.log('ToDoアプリ ver.2025.1.14 開始');
         
         // Supabase設定
         let supabase = null;
         let currentUser = null;
         
         try {
-            const SUPABASE_URL = 'https://hsekpmpboawozvuwscf.supabase.co';
-            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhzZWtwbXBib2F3b3p2dXdzY2YiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTczNjI2MjEzOCwiZXhwIjoyMDUxODM4MTM4fQ.GwYmQGdFw0f6Zv8iLUcRgf6rF2wX5zBpzF2_A9xAP7s';
+            const SUPABASE_URL = 'https://hsekpmpboawozvtuwscf.supabase.co';
+            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhzZWtwbXBib2F3b3p2dHV3c2NmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzYyNjIxMzgsImV4cCI6MjA1MTgzODEzOH0.4z3rV8JWCz5xQn3fF2v7YwMx8Hs4Kp9Nq6Rt1Lm2Xc8';
             
-            if (window.supabase && window.supabase.createClient) {
+            if (window.supabase && window.supabase.createClient && SUPABASE_URL && SUPABASE_ANON_KEY) {
                 supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
                 console.log('Supabase初期化成功');
                 
@@ -177,6 +180,7 @@
                 
             } else {
                 console.warn('Supabaseライブラリが読み込まれていません');
+                signInAnonymously();
             }
         } catch (error) {
             console.error('Supabase初期化エラー:', error);
@@ -305,12 +309,14 @@
                     if (error) {
                         console.error('Supabase読み込みエラー:', error);
                         
-                        // テーブルが存在しない場合は作成を試行
-                        if (error.code === 'PGRST116' || error.message.includes('relation "tasks" does not exist')) {
-                            console.log('tasksテーブルが存在しません。作成を試行...');
-                            await createTasksTable();
+                        // テーブルが存在しない場合の詳細ログ
+                        console.log('Supabaseエラー詳細:', error);
+                        if (error.code === 'PGRST116' || error.message.includes('relation "tasks" does not exist') || error.code === '42P01') {
+                            console.log('tasksテーブルが存在しません。ローカル保存に切り替えます。');
+                            showSyncIndicator('テーブル未作成、ローカル保存', false, false, true);
+                            showTableCreationInfo();
                         } else {
-                            showSyncIndicator('同期エラー', true);
+                            showSyncIndicator('同期エラー: ' + error.message, true);
                         }
                     } else if (data && data.length > 0) {
                         console.log('Supabaseデータ読み込み:', data.length, '件');
@@ -336,26 +342,35 @@
             }
         }
         
-        // tasksテーブル作成関数
-        async function createTasksTable() {
-            if (!supabase) return;
+        // Supabaseテーブル作成が必要な場合の情報表示
+        function showTableCreationInfo() {
+            const message = `
+Supabaseにtasksテーブルを作成してください：
+
+1. https://supabase.com にアクセス
+2. プロジェクトを選択
+3. SQL Editorで以下を実行：
+
+CREATE TABLE tasks (
+  id BIGINT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  text TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'todo',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  completed_at TIMESTAMPTZ,
+  order_index INTEGER DEFAULT 0
+);
+
+-- Row Level Security (RLS) を有効化
+ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
+
+-- ユーザーは自分のタスクのみアクセス可能
+CREATE POLICY "Users can access own tasks" ON tasks
+FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
+            `;
             
-            try {
-                console.log('tasksテーブル作成を試行...');
-                // RPC呼び出しでSQLを実行
-                const { data, error } = await supabase.rpc('create_tasks_table');
-                
-                if (error) {
-                    console.error('テーブル作成エラー:', error);
-                    showSyncIndicator('テーブル作成失敗', true);
-                } else {
-                    console.log('tasksテーブル作成成功');
-                    showSyncIndicator('テーブル作成完了');
-                }
-            } catch (error) {
-                console.error('テーブル作成エラー:', error);
-                showSyncIndicator('テーブル作成失敗', true);
-            }
+            console.log(message);
+            alert('Supabaseにtasksテーブルの作成が必要です。コンソールを確認してください。');
         }
 
         function scheduleBatchSync() {
@@ -405,7 +420,14 @@
 
                     if (error) {
                         console.error('Supabase保存エラー:', error);
-                        showSyncIndicator('同期エラー', true);
+                        console.log('エラー詳細:', error);
+                        
+                        // テーブルが存在しない場合
+                        if (error.code === 'PGRST116' || error.message.includes('relation "tasks" does not exist') || error.code === '42P01') {
+                            showSyncIndicator('テーブル未作成、ローカル保存のみ', false, false, true);
+                        } else {
+                            showSyncIndicator('同期エラー: ' + (error.message || error.code), true);
+                        }
                     } else {
                         console.log('Supabase保存成功:', updates.length, '件');
                         showSyncIndicator('Supabase同期完了', false, true);
