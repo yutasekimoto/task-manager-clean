@@ -111,7 +111,7 @@
     <div class="container">
         <div class="header">
             <h1>To Do</h1>
-            <div class="version">v2025.1.19</div>
+            <div class="version">v2025.1.20</div>
         </div>
 
         <div class="stats">
@@ -162,7 +162,7 @@
 
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script>
-        console.log('ToDoアプリ ver.2025.1.19 開始');
+        console.log('ToDoアプリ ver.2025.1.20 開始');
         
         // Supabase設定
         let supabase = null;
@@ -630,18 +630,25 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
             });
         }
 
-        // タスクテキスト専用のタッチハンドラー
+        // ダブルタップでタスク名編集
+        let lastTap = 0;
+        
         function handleTaskTextTouch(id, event) {
             event.stopPropagation();
             event.preventDefault();
             
-            // スマホでの編集を改善
-            setTimeout(() => {
+            const currentTime = new Date().getTime();
+            const tapLength = currentTime - lastTap;
+            
+            if (tapLength < 500 && tapLength > 0) {
+                // ダブルタップ検出
                 editTaskNameMobile(id);
-            }, 100);
+            }
+            
+            lastTap = currentTime;
         }
         
-        // スマホ専用の編集機能
+        // スマホ専用の編集機能（prompt使用）
         function editTaskNameMobile(id) {
             const task = tasks.find(t => t.id === id);
             if (!task) return;
@@ -652,6 +659,7 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                 pendingSync.add(id);
                 scheduleBatchSync();
                 renderTasks();
+                showTouchDebug('タスク名更新完了');
             }
         }
 
@@ -867,36 +875,46 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
         }
 
         function handleDropLogic(fromIndex, toIndex) {
+            console.log('handleDropLogic実行:', fromIndex, '→', toIndex);
+            showTouchDebug(`DropLogic: ${fromIndex}→${toIndex}`);
+            
             const filtered = getFilteredTasks();
             const draggedTask = filtered[fromIndex];
             const dropTask = filtered[toIndex];
             
-            if (!draggedTask || !dropTask) return;
+            console.log('draggedTask:', draggedTask?.text, 'dropTask:', dropTask?.text);
+            showTouchDebug(`移動: ${draggedTask?.text} → ${dropTask?.text}`);
             
-            const draggedOriginalIndex = tasks.findIndex(t => t.id === draggedTask.id);
-            const dropOriginalIndex = tasks.findIndex(t => t.id === dropTask.id);
-            
-            const newOrder = dropTask.order || 0;
-            draggedTask.order = newOrder;
-            
-            if (draggedOriginalIndex < dropOriginalIndex) {
-                tasks.forEach(task => {
-                    if (task.id !== draggedTask.id && (task.order || 0) > (draggedTask.order || 0) && (task.order || 0) <= newOrder) {
-                        task.order = (task.order || 0) - 1;
-                    }
-                });
-            } else {
-                tasks.forEach(task => {
-                    if (task.id !== draggedTask.id && (task.order || 0) >= newOrder && (task.order || 0) < (draggedTask.order || 0)) {
-                        task.order = (task.order || 0) + 1;
-                    }
-                });
+            if (!draggedTask || !dropTask) {
+                console.log('タスクが見つかりません');
+                showTouchDebug('エラー: タスクが見つかりません');
+                return;
             }
             
+            // 簡素化した並び替えロジック
+            const draggedTaskId = draggedTask.id;
+            const allTasks = [...tasks];
+            
+            // 元の配列からドラッグされたタスクを削除
+            const draggedOriginalIndex = allTasks.findIndex(t => t.id === draggedTaskId);
+            const removedTask = allTasks.splice(draggedOriginalIndex, 1)[0];
+            
+            // 新しい位置に挿入
+            const dropOriginalIndex = allTasks.findIndex(t => t.id === dropTask.id);
+            allTasks.splice(dropOriginalIndex, 0, removedTask);
+            
+            // order値を再設定
+            allTasks.forEach((task, index) => {
+                task.order = index;
+            });
+            
+            tasks = allTasks;
+            
+            console.log('並び替え完了、renderTasks実行');
+            showTouchDebug('並び替え完了、画面更新');
             renderTasks();
             
-            pendingSync.add(draggedTask.id);
-            pendingSync.add(dropTask.id);
+            pendingSync.add(draggedTaskId);
             scheduleBatchSync();
         }
 
@@ -945,7 +963,7 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                      ontouchend="handleTouchEnd(event)">
                     <div class="task-status ${task.status}"></div>
                     <div class="task-content">
-                        <div class="task-text" ${isMobile ? `ontouchend="handleTaskTextTouch(${task.id}, event)"` : `onclick="editTaskName(${task.id}, event)"`} title="${isMobile ? 'タップして編集' : 'クリックして編集'}">${task.text}</div>
+                        <div class="task-text" ${isMobile ? `ontouchend="handleTaskTextTouch(${task.id}, event)"` : `onclick="editTaskName(${task.id}, event)"`} title="${isMobile ? 'ダブルタップで編集' : 'クリックして編集'}">${task.text}</div>
                     </div>
                     <div class="task-actions">
                         ${getTaskActions(task)}
