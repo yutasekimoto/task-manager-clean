@@ -97,7 +97,7 @@
     <div class="container">
         <div class="header">
             <h1>To Do</h1>
-            <div class="version">v2025.1.24</div>
+            <div class="version">v2025.1.25</div>
         </div>
 
         <div class="stats">
@@ -144,7 +144,7 @@
 
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script>
-        console.log('ToDoアプリ ver.2025.1.24 開始');
+        console.log('ToDoアプリ ver.2025.1.25 開始');
         
         // Supabase設定
         let supabase = null;
@@ -587,27 +587,26 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
             });
         }
 
-        // タスク名編集（シングルタップでインライン編集）
-        let isEditingTriggered = false;
-        let tapStartTime = 0;
-        let hasMovedDuringTouch = false;
+        // タスク名編集（ダブルタップで確実に編集）
+        let lastTapTime = 0;
+        let lastTapTarget = null;
         
         function handleTaskTextTouch(id, event) {
             event.stopPropagation();
             event.preventDefault();
             
-            // touchendでのみ編集判定を行う
             const currentTime = Date.now();
-            const touchDuration = currentTime - tapStartTime;
+            const timeDiff = currentTime - lastTapTime;
             
-            // タップが短時間で、移動していない場合のみ編集
-            if (touchDuration < 300 && !hasMovedDuringTouch && !document.querySelector('.task.dragging')) {
-                setTimeout(() => {
-                    editTaskName(id, event);
-                }, 50);
+            // ダブルタップ判定（500ms以内の2回タップ）
+            if (timeDiff < 500 && lastTapTarget === id) {
+                editTaskName(id, event);
+                lastTapTime = 0; // リセット
+                lastTapTarget = null;
+            } else {
+                lastTapTime = currentTime;
+                lastTapTarget = id;
             }
-            
-            hasMovedDuringTouch = false;
         }
 
         function editTaskName(id, event) {
@@ -713,11 +712,12 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                 return;
             }
             
-            // タッチ開始時間を記録
-            tapStartTime = Date.now();
-            hasMovedDuringTouch = false;
+            // タスクテキストの場合はドラッグ無効（ダブルタップ編集のため）
+            if (e.target.closest('.task-text')) {
+                return;
+            }
             
-            // 全ての部分で即座にドラッグ開始
+            // ドラッグ開始（ステータスや空白部分のみ）
             draggedTaskIndex = index;
             isTouching = true;
             touchStartY = e.touches[0].clientY;
@@ -736,11 +736,6 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
             
             touchCurrentY = e.touches[0].clientY;
             const moveDistance = touchCurrentY - touchStartY;
-            
-            // 移動したことを記録
-            if (Math.abs(moveDistance) > 5) {
-                hasMovedDuringTouch = true;
-            }
             
             // ドラッグが開始されている場合のみ処理
             const draggedElement = document.querySelector('.task.dragging');
@@ -787,12 +782,13 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
         }
 
         function handleTouchEnd(e) {
-            if (!isTouching) return;
+            // 確実にクリーンアップ
+            cleanupDragState();
             
-            isTouching = false;
+            if (!isTouching || draggedTaskIndex === null) return;
             
             const draggedElement = document.querySelector('.task.dragging');
-            if (draggedElement && draggedTaskIndex !== null) {
+            if (draggedElement) {
                 e.preventDefault();
                 
                 const moveDistance = touchCurrentY - touchStartY;
@@ -809,20 +805,22 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                         navigator.vibrate && navigator.vibrate(100); // 成功時の振動フィードバック
                     }
                 }
-                
-                // ドラッグ状態をクリア
-                draggedElement.style.transform = '';
-                draggedElement.style.zIndex = '';
-                draggedElement.style.opacity = '';
-                draggedElement.classList.remove('dragging');
             }
             
-            // ドロップターゲット表示をクリア
-            document.querySelectorAll('.task').forEach(task => {
-                task.classList.remove('drag-target-above', 'drag-target-below');
-            });
-            
+            cleanupDragState();
+        }
+        
+        function cleanupDragState() {
+            isTouching = false;
             draggedTaskIndex = null;
+            
+            // 全てのドラッグ関連クラスとスタイルをクリア
+            document.querySelectorAll('.task').forEach(task => {
+                task.classList.remove('dragging', 'drag-target-above', 'drag-target-below');
+                task.style.transform = '';
+                task.style.zIndex = '';
+                task.style.opacity = '';
+            });
         }
 
         function handleDragOver(e, index) {
@@ -928,7 +926,7 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                      ontouchend="handleTouchEnd(event)">
                     <div class="task-status ${task.status}"></div>
                     <div class="task-content">
-                        <div class="task-text" ${isMobile ? `ontouchend="handleTaskTextTouch(${task.id}, event)"` : `onclick="editTaskName(${task.id}, event)"`} title="${isMobile ? 'タップして編集' : 'クリックして編集'}">${task.text}</div>
+                        <div class="task-text" ${isMobile ? `ontouchend="handleTaskTextTouch(${task.id}, event)"` : `onclick="editTaskName(${task.id}, event)"`} title="${isMobile ? 'ダブルタップで編集' : 'クリックして編集'}">${task.text}</div>
                     </div>
                     <div class="task-actions">
                         ${getTaskActions(task)}
@@ -988,6 +986,18 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
             if (pendingSync.size > 0) {
                 localStorage.setItem('taskflow_tasks_' + userId, JSON.stringify(tasks));
             }
+        });
+        
+        // ウィンドウ全体でのtouchendイベント（フリーズ防止）
+        window.addEventListener('touchend', (e) => {
+            if (isTouching || document.querySelector('.task.dragging')) {
+                cleanupDragState();
+            }
+        });
+        
+        // 画面外へのドラッグでもクリーンアップ
+        window.addEventListener('touchcancel', (e) => {
+            cleanupDragState();
         });
     </script>
 </body>
