@@ -94,7 +94,7 @@
     <div class="container">
         <div class="header">
             <h1>To Do</h1>
-            <div class="version">v2025.1.16</div>
+            <div class="version">v2025.1.17</div>
         </div>
 
         <div class="stats">
@@ -140,7 +140,7 @@
 
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script>
-        console.log('ToDoアプリ ver.2025.1.16 開始');
+        console.log('ToDoアプリ ver.2025.1.17 開始');
         
         // Supabase設定
         let supabase = null;
@@ -219,6 +219,9 @@
         let pendingSync = new Set();
         let syncTimer = null;
 
+        // デバイス判定
+        const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                         ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 
         // スマホ対応: タッチイベント用変数
         let touchStartY = 0;
@@ -584,9 +587,23 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
             event.stopPropagation();
             event.preventDefault();
             
-            // タッチ中でない場合のみ編集開始
-            if (!isTouching) {
-                editTaskName(id, event);
+            // スマホでの編集を改善
+            setTimeout(() => {
+                editTaskNameMobile(id);
+            }, 100);
+        }
+        
+        // スマホ専用の編集機能
+        function editTaskNameMobile(id) {
+            const task = tasks.find(t => t.id === id);
+            if (!task) return;
+            
+            const newText = prompt('タスク名を編集:', task.text);
+            if (newText && newText.trim() && newText.trim() !== task.text) {
+                task.text = newText.trim();
+                pendingSync.add(id);
+                scheduleBatchSync();
+                renderTasks();
             }
         }
 
@@ -680,7 +697,6 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                 return;
             }
             
-            e.preventDefault();
             draggedTaskIndex = index;
             isTouching = true;
             touchStartY = e.touches[0].clientY;
@@ -688,13 +704,10 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
             
             const taskElement = e.target.closest('.task');
             if (taskElement) {
-                // 長押し判定用のタイマー（300ms後にドラッグ開始）
-                setTimeout(() => {
-                    if (isTouching && Math.abs(touchCurrentY - touchStartY) < 10) {
-                        taskElement.classList.add('dragging');
-                        navigator.vibrate && navigator.vibrate(50); // 振動フィードバック
-                    }
-                }, 300);
+                // 即座にドラッグ開始
+                taskElement.classList.add('dragging');
+                navigator.vibrate && navigator.vibrate(50); // 振動フィードバック
+                e.preventDefault();
             }
         }
 
@@ -728,15 +741,19 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                 e.preventDefault();
                 
                 const moveDistance = touchCurrentY - touchStartY;
-                const taskHeight = 60;
-                const moveSteps = Math.round(moveDistance / taskHeight);
-                const filteredTasks = getFilteredTasks();
-                const dropIndex = Math.max(0, Math.min(filteredTasks.length - 1, draggedTaskIndex + moveSteps));
                 
-                // 移動距離が十分大きい場合のみドロップ処理を実行
-                if (Math.abs(moveDistance) > 30 && dropIndex !== draggedTaskIndex) {
-                    handleDropLogic(draggedTaskIndex, dropIndex);
-                    navigator.vibrate && navigator.vibrate(100); // 成功時の振動フィードバック
+                // より感度の良いドロップ処理
+                if (Math.abs(moveDistance) > 20) {
+                    const taskHeight = 60;
+                    const moveSteps = Math.round(moveDistance / taskHeight);
+                    const filteredTasks = getFilteredTasks();
+                    const newIndex = Math.max(0, Math.min(filteredTasks.length - 1, draggedTaskIndex + moveSteps));
+                    
+                    if (newIndex !== draggedTaskIndex) {
+                        console.log('タッチでの並び替え:', draggedTaskIndex, '→', newIndex);
+                        handleDropLogic(draggedTaskIndex, newIndex);
+                        navigator.vibrate && navigator.vibrate(100); // 成功時の振動フィードバック
+                    }
                 }
                 
                 // ドラッグ状態をクリア
@@ -852,7 +869,7 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                      ontouchend="handleTouchEnd(event)">
                     <div class="task-status ${task.status}"></div>
                     <div class="task-content">
-                        <div class="task-text" onclick="editTaskName(${task.id}, event)" ontouchend="handleTaskTextTouch(${task.id}, event)" title="タップして編集">${task.text}</div>
+                        <div class="task-text" ${isMobile ? `ontouchend="handleTaskTextTouch(${task.id}, event)"` : `onclick="editTaskName(${task.id}, event)"`} title="${isMobile ? 'タップして編集' : 'クリックして編集'}">${task.text}</div>
                     </div>
                     <div class="task-actions">
                         ${getTaskActions(task)}
