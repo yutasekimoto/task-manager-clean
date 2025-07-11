@@ -94,7 +94,7 @@
     <div class="container">
         <div class="header">
             <h1>To Do</h1>
-            <div class="version">v2025.1.17</div>
+            <div class="version">v2025.1.18-Debug</div>
         </div>
 
         <div class="stats">
@@ -140,7 +140,7 @@
 
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script>
-        console.log('ToDoアプリ ver.2025.1.17 開始');
+        console.log('ToDoアプリ ver.2025.1.18-Debug 開始');
         
         // Supabase設定
         let supabase = null;
@@ -692,8 +692,11 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
         }
 
         function handleTouchStart(e, index) {
+            console.log('handleTouchStart:', index, 'target:', e.target.className);
+            
             // アクションボタンやタスクテキストへのタッチの場合はドラッグを無効化
             if (e.target.closest('.task-actions') || e.target.closest('.task-text')) {
+                console.log('タッチ無効化: アクションまたはテキスト');
                 return;
             }
             
@@ -702,12 +705,15 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
             touchStartY = e.touches[0].clientY;
             touchCurrentY = touchStartY;
             
+            console.log('ドラッグ開始:', index, 'Y:', touchStartY);
+            
             const taskElement = e.target.closest('.task');
             if (taskElement) {
                 // 即座にドラッグ開始
                 taskElement.classList.add('dragging');
                 navigator.vibrate && navigator.vibrate(50); // 振動フィードバック
                 e.preventDefault();
+                console.log('ドラッグ要素準備完了');
             }
         }
 
@@ -716,6 +722,8 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
             
             touchCurrentY = e.touches[0].clientY;
             const moveDistance = touchCurrentY - touchStartY;
+            
+            console.log('touchMove:', moveDistance);
             
             // ドラッグが開始されている場合のみ処理
             const draggedElement = document.querySelector('.task.dragging');
@@ -727,11 +735,14 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                 // 移動距離が一定以上の場合、ドラッグ中であることを示す
                 if (Math.abs(moveDistance) > 10) {
                     draggedElement.style.opacity = '0.7';
+                    console.log('ドラッグ中表示更新');
                 }
             }
         }
 
         function handleTouchEnd(e) {
+            console.log('handleTouchEnd: isTouching=', isTouching, 'draggedTaskIndex=', draggedTaskIndex);
+            
             if (!isTouching) return;
             
             isTouching = false;
@@ -741,6 +752,7 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                 e.preventDefault();
                 
                 const moveDistance = touchCurrentY - touchStartY;
+                console.log('移動距離:', moveDistance);
                 
                 // より感度の良いドロップ処理
                 if (Math.abs(moveDistance) > 20) {
@@ -749,11 +761,17 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                     const filteredTasks = getFilteredTasks();
                     const newIndex = Math.max(0, Math.min(filteredTasks.length - 1, draggedTaskIndex + moveSteps));
                     
+                    console.log('計算結果: moveSteps=', moveSteps, 'newIndex=', newIndex, 'filteredTasks.length=', filteredTasks.length);
+                    
                     if (newIndex !== draggedTaskIndex) {
-                        console.log('タッチでの並び替え:', draggedTaskIndex, '→', newIndex);
+                        console.log('タッチでの並び替え実行:', draggedTaskIndex, '→', newIndex);
                         handleDropLogic(draggedTaskIndex, newIndex);
                         navigator.vibrate && navigator.vibrate(100); // 成功時の振動フィードバック
+                    } else {
+                        console.log('並び替えなし: 同じインデックス');
                     }
+                } else {
+                    console.log('移動距離不足:', Math.abs(moveDistance));
                 }
                 
                 // ドラッグ状態をクリア
