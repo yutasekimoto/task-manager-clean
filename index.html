@@ -94,7 +94,7 @@
     <div class="container">
         <div class="header">
             <h1>To Do</h1>
-            <div class="version">v2025.1.15</div>
+            <div class="version">v2025.1.16</div>
         </div>
 
         <div class="stats">
@@ -140,7 +140,7 @@
 
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script>
-        console.log('ToDoアプリ ver.2025.1.15 開始');
+        console.log('ToDoアプリ ver.2025.1.16 開始');
         
         // Supabase設定
         let supabase = null;
@@ -579,12 +579,18 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
             });
         }
 
-        function editTaskName(id, event) {
-            // タッチイベントやドラッグ中は編集を無効化
-            if (isTouching || draggedTaskIndex !== null) {
-                return;
-            }
+        // タスクテキスト専用のタッチハンドラー
+        function handleTaskTextTouch(id, event) {
+            event.stopPropagation();
+            event.preventDefault();
             
+            // タッチ中でない場合のみ編集開始
+            if (!isTouching) {
+                editTaskName(id, event);
+            }
+        }
+
+        function editTaskName(id, event) {
             // イベントの伝播を停止してドラッグイベントとの干渉を防ぐ
             if (event) {
                 event.stopPropagation();
@@ -669,8 +675,8 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
         }
 
         function handleTouchStart(e, index) {
-            // アクションボタンへのタッチの場合はドラッグを無効化
-            if (e.target.closest('.task-actions')) {
+            // アクションボタンやタスクテキストへのタッチの場合はドラッグを無効化
+            if (e.target.closest('.task-actions') || e.target.closest('.task-text')) {
                 return;
             }
             
@@ -682,25 +688,26 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
             
             const taskElement = e.target.closest('.task');
             if (taskElement) {
-                taskElement.classList.add('dragging');
-                // 長押し判定用のタイマー
+                // 長押し判定用のタイマー（300ms後にドラッグ開始）
                 setTimeout(() => {
-                    if (isTouching) {
+                    if (isTouching && Math.abs(touchCurrentY - touchStartY) < 10) {
+                        taskElement.classList.add('dragging');
                         navigator.vibrate && navigator.vibrate(50); // 振動フィードバック
                     }
-                }, 100);
+                }, 300);
             }
         }
 
         function handleTouchMove(e) {
             if (!isTouching || draggedTaskIndex === null) return;
             
-            e.preventDefault();
             touchCurrentY = e.touches[0].clientY;
+            const moveDistance = touchCurrentY - touchStartY;
             
+            // ドラッグが開始されている場合のみ処理
             const draggedElement = document.querySelector('.task.dragging');
             if (draggedElement) {
-                const moveDistance = touchCurrentY - touchStartY;
+                e.preventDefault();
                 draggedElement.style.transform = `translateY(${moveDistance}px) rotate(2deg)`;
                 draggedElement.style.zIndex = '1000';
                 
@@ -712,25 +719,27 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
         }
 
         function handleTouchEnd(e) {
-            if (!isTouching || draggedTaskIndex === null) return;
+            if (!isTouching) return;
             
-            e.preventDefault();
             isTouching = false;
             
-            const moveDistance = touchCurrentY - touchStartY;
-            const taskHeight = 60;
-            const moveSteps = Math.round(moveDistance / taskHeight);
-            const filteredTasks = getFilteredTasks();
-            const dropIndex = Math.max(0, Math.min(filteredTasks.length - 1, draggedTaskIndex + moveSteps));
-            
-            // 移動距離が十分大きい場合のみドロップ処理を実行
-            if (Math.abs(moveDistance) > 20 && dropIndex !== draggedTaskIndex) {
-                handleDropLogic(draggedTaskIndex, dropIndex);
-                navigator.vibrate && navigator.vibrate(100); // 成功時の振動フィードバック
-            }
-            
             const draggedElement = document.querySelector('.task.dragging');
-            if (draggedElement) {
+            if (draggedElement && draggedTaskIndex !== null) {
+                e.preventDefault();
+                
+                const moveDistance = touchCurrentY - touchStartY;
+                const taskHeight = 60;
+                const moveSteps = Math.round(moveDistance / taskHeight);
+                const filteredTasks = getFilteredTasks();
+                const dropIndex = Math.max(0, Math.min(filteredTasks.length - 1, draggedTaskIndex + moveSteps));
+                
+                // 移動距離が十分大きい場合のみドロップ処理を実行
+                if (Math.abs(moveDistance) > 30 && dropIndex !== draggedTaskIndex) {
+                    handleDropLogic(draggedTaskIndex, dropIndex);
+                    navigator.vibrate && navigator.vibrate(100); // 成功時の振動フィードバック
+                }
+                
+                // ドラッグ状態をクリア
                 draggedElement.style.transform = '';
                 draggedElement.style.zIndex = '';
                 draggedElement.style.opacity = '';
@@ -843,7 +852,7 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                      ontouchend="handleTouchEnd(event)">
                     <div class="task-status ${task.status}"></div>
                     <div class="task-content">
-                        <div class="task-text" onclick="editTaskName(${task.id}, event)" title="クリックして編集">${task.text}</div>
+                        <div class="task-text" onclick="editTaskName(${task.id}, event)" ontouchend="handleTaskTextTouch(${task.id}, event)" title="タップして編集">${task.text}</div>
                     </div>
                     <div class="task-actions">
                         ${getTaskActions(task)}
