@@ -94,7 +94,7 @@
     <div class="container">
         <div class="header">
             <h1>To Do</h1>
-            <div class="version">v2025.1.14</div>
+            <div class="version">v2025.1.15</div>
         </div>
 
         <div class="stats">
@@ -140,7 +140,7 @@
 
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script>
-        console.log('ToDoアプリ ver.2025.1.14 開始');
+        console.log('ToDoアプリ ver.2025.1.15 開始');
         
         // Supabase設定
         let supabase = null;
@@ -148,7 +148,7 @@
         
         try {
             const SUPABASE_URL = 'https://hsekpmpboawozvtuwscf.supabase.co';
-            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhzZWtwbXBib2F3b3p2dHV3c2NmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzYyNjIxMzgsImV4cCI6MjA1MTgzODEzOH0.4z3rV8JWCz5xQn3fF2v7YwMx8Hs4Kp9Nq6Rt1Lm2Xc8';
+            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhzZWtwbXBib2F3b3p2dHV3c2NmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE4OTI5NDAsImV4cCI6MjA2NzQ2ODk0MH0.IgGMu0tJYhnTtW1GoDcf0qk64Yhwyp6_1ZRl2S7b3ns';
             
             if (window.supabase && window.supabase.createClient && SUPABASE_URL && SUPABASE_ANON_KEY) {
                 supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
