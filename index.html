@@ -32,6 +32,8 @@
         .task:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         .task.dragging { opacity: 0.5; transform: rotate(2deg); z-index: 1000; }
         .task.drag-over { border-top: 3px solid #667eea; }
+        .task.drag-target-above { margin-top: 60px; transition: margin-top 0.2s ease; }
+        .task.drag-target-below { margin-bottom: 60px; transition: margin-bottom 0.2s ease; }
         .task-actions button { touch-action: manipulation; }
         .task.completed { opacity: 0.6; }
         .task.completed .task-text { text-decoration: line-through; }
@@ -95,7 +97,7 @@
     <div class="container">
         <div class="header">
             <h1>To Do</h1>
-            <div class="version">v2025.1.21</div>
+            <div class="version">v2025.1.24</div>
         </div>
 
         <div class="stats">
@@ -142,7 +144,7 @@
 
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script>
-        console.log('ToDoアプリ ver.2025.1.21 開始');
+        console.log('ToDoアプリ ver.2025.1.24 開始');
         
         // Supabase設定
         let supabase = null;
@@ -585,36 +587,27 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
             });
         }
 
-        // ダブルタップでタスク名編集
-        let lastTap = 0;
+        // タスク名編集（シングルタップでインライン編集）
+        let isEditingTriggered = false;
+        let tapStartTime = 0;
+        let hasMovedDuringTouch = false;
         
         function handleTaskTextTouch(id, event) {
             event.stopPropagation();
             event.preventDefault();
             
-            const currentTime = new Date().getTime();
-            const tapLength = currentTime - lastTap;
+            // touchendでのみ編集判定を行う
+            const currentTime = Date.now();
+            const touchDuration = currentTime - tapStartTime;
             
-            if (tapLength < 500 && tapLength > 0) {
-                // ダブルタップ検出
-                editTaskNameMobile(id);
+            // タップが短時間で、移動していない場合のみ編集
+            if (touchDuration < 300 && !hasMovedDuringTouch && !document.querySelector('.task.dragging')) {
+                setTimeout(() => {
+                    editTaskName(id, event);
+                }, 50);
             }
             
-            lastTap = currentTime;
-        }
-        
-        // スマホ専用の編集機能（prompt使用）
-        function editTaskNameMobile(id) {
-            const task = tasks.find(t => t.id === id);
-            if (!task) return;
-            
-            const newText = prompt('タスク名を編集:', task.text);
-            if (newText && newText.trim() && newText.trim() !== task.text) {
-                task.text = newText.trim();
-                pendingSync.add(id);
-                scheduleBatchSync();
-                renderTasks();
-            }
+            hasMovedDuringTouch = false;
         }
 
         function editTaskName(id, event) {
@@ -637,32 +630,41 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                 return;
             }
             
+            // インライン編集の準備
+            const originalText = task.text;
             taskElement.contentEditable = true;
             taskElement.classList.add('editing');
             
-            // モバイルでのフォーカス処理を改善
-            setTimeout(() => {
-                taskElement.focus();
-                
-                // テキスト選択（モバイル対応）
-                if (window.getSelection && document.createRange) {
+            // フォーカスとテキスト選択
+            taskElement.focus();
+            
+            // モバイルでのテキスト選択を確実に
+            if (isMobile) {
+                setTimeout(() => {
                     const range = document.createRange();
                     range.selectNodeContents(taskElement);
                     const selection = window.getSelection();
                     selection.removeAllRanges();
                     selection.addRange(range);
-                } else if (taskElement.setSelectionRange) {
-                    // フォールバック
-                    taskElement.setSelectionRange(0, taskElement.textContent.length);
-                }
-            }, 100);
+                }, 50);
+            } else {
+                // PC用
+                const range = document.createRange();
+                range.selectNodeContents(taskElement);
+                const selection = window.getSelection();
+                selection.removeAllRanges();
+                selection.addRange(range);
+            }
             
             function finishEdit() {
                 const newText = taskElement.textContent.trim();
-                if (newText && newText !== task.text) {
+                if (newText && newText !== originalText) {
                     task.text = newText;
                     pendingSync.add(id);
                     scheduleBatchSync();
+                } else if (!newText) {
+                    // 空の場合は元のテキストに戻す
+                    task.text = originalText;
                 }
                 
                 taskElement.contentEditable = false;
@@ -670,26 +672,30 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                 renderTasks();
             }
             
-            // イベントリスナーを一度だけ追加
-            const blurHandler = () => {
+            // イベントリスナー
+            function onBlur() {
                 finishEdit();
-                taskElement.removeEventListener('blur', blurHandler);
-            };
+                cleanup();
+            }
             
-            const keyHandler = (e) => {
-                e.stopPropagation(); // キーイベントの伝播を停止
+            function onKeyDown(e) {
+                e.stopPropagation();
                 if (e.key === 'Enter') {
                     e.preventDefault();
-                    taskElement.blur();
+                    finishEdit();
                 } else if (e.key === 'Escape') {
-                    taskElement.textContent = task.text;
-                    taskElement.blur();
+                    taskElement.textContent = originalText;
+                    finishEdit();
                 }
-                taskElement.removeEventListener('keydown', keyHandler);
-            };
+            }
             
-            taskElement.addEventListener('blur', blurHandler);
-            taskElement.addEventListener('keydown', keyHandler);
+            function cleanup() {
+                taskElement.removeEventListener('blur', onBlur);
+                taskElement.removeEventListener('keydown', onKeyDown);
+            }
+            
+            taskElement.addEventListener('blur', onBlur);
+            taskElement.addEventListener('keydown', onKeyDown);
         }
 
         // ドラッグ&ドロップ処理（PC + スマホ対応）
@@ -702,11 +708,16 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
         }
 
         function handleTouchStart(e, index) {
-            // アクションボタンやタスクテキストへのタッチの場合はドラッグを無効化
-            if (e.target.closest('.task-actions') || e.target.closest('.task-text')) {
+            // アクションボタンへのタッチの場合のみドラッグを無効化
+            if (e.target.closest('.task-actions')) {
                 return;
             }
             
+            // タッチ開始時間を記録
+            tapStartTime = Date.now();
+            hasMovedDuringTouch = false;
+            
+            // 全ての部分で即座にドラッグ開始
             draggedTaskIndex = index;
             isTouching = true;
             touchStartY = e.touches[0].clientY;
@@ -714,7 +725,6 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
             
             const taskElement = e.target.closest('.task');
             if (taskElement) {
-                // 即座にドラッグ開始
                 taskElement.classList.add('dragging');
                 navigator.vibrate && navigator.vibrate(50); // 振動フィードバック
                 e.preventDefault();
@@ -727,6 +737,11 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
             touchCurrentY = e.touches[0].clientY;
             const moveDistance = touchCurrentY - touchStartY;
             
+            // 移動したことを記録
+            if (Math.abs(moveDistance) > 5) {
+                hasMovedDuringTouch = true;
+            }
+            
             // ドラッグが開始されている場合のみ処理
             const draggedElement = document.querySelector('.task.dragging');
             if (draggedElement) {
@@ -737,6 +752,36 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                 // 移動距離が一定以上の場合、ドラッグ中であることを示す
                 if (Math.abs(moveDistance) > 10) {
                     draggedElement.style.opacity = '0.7';
+                    updateDropTarget(moveDistance);
+                }
+            }
+        }
+        
+        function updateDropTarget(moveDistance) {
+            // 既存のドロップターゲット表示をクリア
+            document.querySelectorAll('.task').forEach(task => {
+                task.classList.remove('drag-target-above', 'drag-target-below');
+            });
+            
+            if (Math.abs(moveDistance) < 20) return;
+            
+            const taskHeight = 60;
+            const moveSteps = Math.round(moveDistance / taskHeight);
+            const filteredTasks = getFilteredTasks();
+            const newIndex = Math.max(0, Math.min(filteredTasks.length - 1, draggedTaskIndex + moveSteps));
+            
+            if (newIndex !== draggedTaskIndex && newIndex < filteredTasks.length) {
+                const targetTask = filteredTasks[newIndex];
+                const targetElement = document.querySelector(`[data-task-id="${targetTask.id}"]`);
+                
+                if (targetElement) {
+                    if (moveDistance > 0) {
+                        // 下に移動
+                        targetElement.classList.add('drag-target-below');
+                    } else {
+                        // 上に移動
+                        targetElement.classList.add('drag-target-above');
+                    }
                 }
             }
         }
@@ -771,6 +816,11 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                 draggedElement.style.opacity = '';
                 draggedElement.classList.remove('dragging');
             }
+            
+            // ドロップターゲット表示をクリア
+            document.querySelectorAll('.task').forEach(task => {
+                task.classList.remove('drag-target-above', 'drag-target-below');
+            });
             
             draggedTaskIndex = null;
         }
@@ -836,7 +886,7 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
         function handleDragEnd(e) {
             e.target.classList.remove('dragging');
             document.querySelectorAll('.task').forEach(task => {
-                task.classList.remove('drag-over');
+                task.classList.remove('drag-over', 'drag-target-above', 'drag-target-below');
             });
             draggedTaskIndex = null;
         }
@@ -878,7 +928,7 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                      ontouchend="handleTouchEnd(event)">
                     <div class="task-status ${task.status}"></div>
                     <div class="task-content">
-                        <div class="task-text" ${isMobile ? `ontouchend="handleTaskTextTouch(${task.id}, event)"` : `onclick="editTaskName(${task.id}, event)"`} title="${isMobile ? 'ダブルタップで編集' : 'クリックして編集'}">${task.text}</div>
+                        <div class="task-text" ${isMobile ? `ontouchend="handleTaskTextTouch(${task.id}, event)"` : `onclick="editTaskName(${task.id}, event)"`} title="${isMobile ? 'タップして編集' : 'クリックして編集'}">${task.text}</div>
                     </div>
                     <div class="task-actions">
                         ${getTaskActions(task)}
