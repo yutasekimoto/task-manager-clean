@@ -161,7 +161,6 @@
                     <button onclick="insertMemoFormat('bullet')" title="箇条書き">• 箇条書き</button>
                     <button onclick="insertMemoFormat('number')" title="番号付きリスト">1. 番号リスト</button>
                     <button onclick="insertMemoFormat('checkbox')" title="チェックボックス">☐ チェックボックス</button>
-                    <button onclick="insertMemoFormat('checkbox-checked')" title="チェック済み">☑ チェック済み</button>
                 </div>
                 <textarea class="memo-editor" id="memoEditor" placeholder="メモを入力してください..."></textarea>
             </div>
@@ -692,9 +691,6 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                     break;
                 case 'checkbox':
                     replacement = '\u2610 ' + (selectedText || 'タスク');
-                    break;
-                case 'checkbox-checked':
-                    replacement = '\u2611 ' + (selectedText || '完了タスク');
                     break;
             }
             
