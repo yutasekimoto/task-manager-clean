@@ -30,7 +30,7 @@
         .tasks { space: 15px; }
         .task { background: rgba(255,255,255,0.95); padding: 12px 16px; margin-bottom: 8px; border-radius: 12px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: all 0.2s ease; touch-action: manipulation; }
         .task:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
-        .task.progress { background: rgba(102, 126, 234, 0.1); border-left: 4px solid #667eea; }
+        .task.progress { background: rgba(255, 193, 7, 0.15); border-left: 4px solid #ffc107; }
         .task.dragging { opacity: 0.5; transform: rotate(2deg); z-index: 1000; }
         .task.drag-over { border-top: 3px solid #667eea; }
         .task.drag-target-above { margin-top: 60px; transition: margin-top 0.2s ease; }
@@ -40,6 +40,10 @@
         .task.completed .task-text { text-decoration: line-through; }
         .drag-handle { width: 20px; height: 20px; cursor: move; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #999; font-size: 16px; }
         .drag-handle:hover { color: #667eea; }
+        .memo-icon { width: 20px; height: 20px; cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #999; font-size: 14px; transition: color 0.2s ease; }
+        .memo-icon:hover { color: #667eea; }
+        .memo-icon.has-memo { color: #ffc107; }
+        .memo-icon.has-memo:hover { color: #ff9800; }
         .task-content { flex: 1; }
         .task-text { font-size: 15px; cursor: pointer; padding: 2px 4px; border-radius: 4px; transition: background 0.2s ease; }
         .task-text:hover { background: rgba(0,0,0,0.05); }
@@ -696,14 +700,10 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
             editor.setSelectionRange(start + replacement.length, start + replacement.length);
         }
         
-        // タスクカードクリックハンドラ
-        function handleTaskClick(taskId, event) {
-            // ドラッグハンドルやアクションボタンのクリックは無視
-            if (event.target.closest('.drag-handle') || event.target.closest('.task-actions')) {
-                return;
-            }
-            
+        // メモアイコンクリックハンドラ
+        function handleMemoClick(taskId, event) {
             event.stopPropagation();
+            event.preventDefault();
             openMemoEditor(taskId);
         }
         
@@ -1043,12 +1043,12 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                      ondragend="handleDragEnd(event)"
                      ontouchstart="handleTouchStart(event, ${index})"
                      ontouchmove="handleTouchMove(event)"
-                     ontouchend="handleTouchEnd(event)"
-                     onclick="handleTaskClick(${task.id}, event)">
+                     ontouchend="handleTouchEnd(event)">
                     <div class="drag-handle" title="ドラッグして並び替え">☰</div>
                     <div class="task-content">
                         <div class="task-text" ${isMobile ? `ontouchend="handleTaskTextTouch(${task.id}, event)"` : `onclick="editTaskName(${task.id}, event)"`} title="${isMobile ? 'ダブルタップで編集' : 'クリックして編集'}">${task.text}</div>
                     </div>
+                    <div class="memo-icon ${task.memo && task.memo.trim() ? 'has-memo' : ''}" onclick="handleMemoClick(${task.id}, event)" title="メモを編集">📝</div>
                     <div class="task-actions">
                         ${getTaskActions(task)}
                     </div>
