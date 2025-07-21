@@ -708,6 +708,43 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
             const editor = document.getElementById('memoEditor');
             if (!editor) return;
             
+            // チェックボックスのクリックイベント
+            editor.addEventListener('click', function(e) {
+                const clickPos = this.selectionStart;
+                const lines = this.value.split('\n');
+                let currentPos = 0;
+                
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i];
+                    const lineEnd = currentPos + line.length;
+                    
+                    if (clickPos >= currentPos && clickPos <= lineEnd) {
+                        // チェックボックスの位置をチェック
+                        const checkboxMatch = line.match(/^(\u2610|\u2611) /);
+                        if (checkboxMatch) {
+                            const checkboxPos = currentPos;
+                            const checkboxEnd = currentPos + 2; // チェックボックス + スペース
+                            
+                            // チェックボックス部分をクリックした場合
+                            if (clickPos >= checkboxPos && clickPos <= checkboxEnd) {
+                                e.preventDefault();
+                                
+                                // チェック状態を切り替え
+                                const newCheckbox = checkboxMatch[1] === '\u2610' ? '\u2611' : '\u2610';
+                                const newLine = newCheckbox + line.substring(1);
+                                lines[i] = newLine;
+                                
+                                this.value = lines.join('\n');
+                                this.setSelectionRange(clickPos, clickPos);
+                                return;
+                            }
+                        }
+                        break;
+                    }
+                    currentPos = lineEnd + 1; // +1 for newline character
+                }
+            });
+            
             editor.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter') {
                     const start = this.selectionStart;
