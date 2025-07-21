@@ -1,0 +1,70 @@
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Claude configuration files
+.claude/
+.claude.json
+.claude.json.backup
+
+# User specific files
+.CFUserTextEncoding
+.anaconda/
+.condarc
+.config/
+.cursor/
+.gitconfig
+.idlerc/
+.npm/
+.pgladmin/
+.pylint.d/
+.python_history
+.swiftpm/
+.vscode/
+.zprofile
+.zsh_history
+.zsh_sessions/
+.zshrc
+
+# System directories
+Applications/
+Desktop/
+Documents/
+Downloads/
+Library/
+Movies/
+Music/
+Pictures/
+Public/
+opt/
+
+# Creative Cloud and other app files
+Creative Cloud Files*
+
+# Temporary files
+*.tmp
+*.temp
+
+# Document files (if not part of project)
+*.pdf
+*.docx
+*.xlsx
+*.pptx
+*.jpg
+*.jpeg
+*.png
+
+# Other directories
+cooking2/
+自己研鑽/
+
+# Other HTML files that might be temporary
+task-manager.html
