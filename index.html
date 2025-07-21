@@ -30,7 +30,7 @@
         .tasks { space: 15px; }
         .task { background: rgba(255,255,255,0.95); padding: 12px 16px; margin-bottom: 8px; border-radius: 12px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: all 0.2s ease; touch-action: manipulation; }
         .task:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
-        .task.progress { background: rgba(255, 193, 7, 0.15); border-left: 4px solid #ffc107; }
+        .task.progress { background: rgba(255, 152, 0, 0.2); border-left: 4px solid #ff9800; box-shadow: 0 2px 4px rgba(255, 152, 0, 0.1); }
         .task.dragging { opacity: 0.5; transform: rotate(2deg); z-index: 1000; }
         .task.drag-over { border-top: 3px solid #667eea; }
         .task.drag-target-above { margin-top: 60px; transition: margin-top 0.2s ease; }
@@ -101,7 +101,7 @@
         .memo-title { font-size: 18px; font-weight: bold; flex: 1; }
         .memo-close { background: none; border: none; color: white; font-size: 24px; cursor: pointer; padding: 0; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; }
         .memo-content { flex: 1; padding: 20px; overflow-y: auto; }
-        .memo-editor { width: 100%; height: 300px; border: 1px solid #ddd; border-radius: 8px; padding: 15px; font-size: 14px; font-family: inherit; resize: vertical; }
+        .memo-editor { width: 100%; height: 300px; border: 1px solid #ddd; border-radius: 8px; padding: 15px; font-size: 16px; font-family: inherit; resize: vertical; }
         .memo-toolbar { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
         .memo-toolbar button { padding: 8px 12px; background: #f8f9fa; border: 1px solid #ddd; border-radius: 6px; cursor: pointer; font-size: 12px; }
         .memo-toolbar button:hover { background: #e9ecef; }
@@ -649,7 +649,10 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
             editorElement.value = task.memo || '';
             
             overlay.classList.add('show');
-            setTimeout(() => editorElement.focus(), 100);
+            setTimeout(() => {
+                editorElement.focus();
+                setupMemoEditor();
+            }, 100);
         }
         
         function closeMemoEditor() {
@@ -698,6 +701,50 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
             editor.value = editor.value.substring(0, start) + replacement + editor.value.substring(end);
             editor.focus();
             editor.setSelectionRange(start + replacement.length, start + replacement.length);
+        }
+        
+        // メモエディターのキーイベント処理
+        function setupMemoEditor() {
+            const editor = document.getElementById('memoEditor');
+            if (!editor) return;
+            
+            editor.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    const start = this.selectionStart;
+                    const lines = this.value.substring(0, start).split('\n');
+                    const currentLine = lines[lines.length - 1];
+                    
+                    // 箇条書きの継続
+                    if (currentLine.match(/^\u2022 /)) {
+                        e.preventDefault();
+                        const afterCursor = this.value.substring(start);
+                        this.value = this.value.substring(0, start) + '\n\u2022 ' + afterCursor;
+                        this.setSelectionRange(start + 3, start + 3);
+                        return;
+                    }
+                    
+                    // 番号付きリストの継続
+                    const numberMatch = currentLine.match(/^(\d+)\. /);
+                    if (numberMatch) {
+                        e.preventDefault();
+                        const nextNumber = parseInt(numberMatch[1]) + 1;
+                        const afterCursor = this.value.substring(start);
+                        this.value = this.value.substring(0, start) + '\n' + nextNumber + '. ' + afterCursor;
+                        const newPos = start + nextNumber.toString().length + 3;
+                        this.setSelectionRange(newPos, newPos);
+                        return;
+                    }
+                    
+                    // チェックボックスの継続
+                    if (currentLine.match(/^[\u2610\u2611] /)) {
+                        e.preventDefault();
+                        const afterCursor = this.value.substring(start);
+                        this.value = this.value.substring(0, start) + '\n\u2610 ' + afterCursor;
+                        this.setSelectionRange(start + 3, start + 3);
+                        return;
+                    }
+                }
+            });
         }
         
         // メモアイコンクリックハンドラ
