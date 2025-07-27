@@ -38,7 +38,7 @@
         .task { background: rgba(255,255,255,0.95); padding: 12px 16px; margin-bottom: 8px; border-radius: 12px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: all 0.2s ease; touch-action: manipulation; }
         .task:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
         .task.progress { background: rgba(255, 183, 77, 0.8); border-left: 4px solid #ff9800; box-shadow: 0 2px 4px rgba(255, 152, 0, 0.2); }
-        .task.paused { background: rgba(173, 216, 230, 0.8); border-left: 4px solid #87ceeb; box-shadow: 0 2px 4px rgba(173, 216, 230, 0.2); }
+        .task.paused { background: rgba(173, 216, 230, 0.9); border-left: 4px solid #17a2b8; box-shadow: 0 2px 4px rgba(23, 162, 184, 0.3); }
         .task.dragging { opacity: 0.5; transform: rotate(2deg); z-index: 1000; }
         .task.drag-over { border-top: 3px solid #667eea; }
         .task.drag-target-above { margin-top: 60px; transition: margin-top 0.2s ease; }
@@ -70,6 +70,8 @@
         .task-actions .back:hover { background: #fff3cd; }
         .task-actions .pause { color: #17a2b8; }
         .task-actions .pause:hover { background: #d1ecf1; }
+        .task-actions .resume { color: #28a745; }
+        .task-actions .resume:hover { background: #d4edda; }
         .empty { text-align: center; padding: 40px; color: rgba(255,255,255,0.8); }
         .sync-indicator { 
             position: fixed; 
@@ -1342,11 +1344,10 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                 actions += `<button class="start" onclick="changeStatus(${task.id}, 'progress')" title="開始">▷</button>`;
                 actions += `<button class="complete" onclick="changeStatus(${task.id}, 'completed')" title="完了">✓</button>`;
             } else if (task.status === 'progress') {
-                actions += `<button class="back" onclick="changeStatus(${task.id}, 'todo')" title="戻す">⏸</button>`;
                 actions += `<button class="pause" onclick="changeStatus(${task.id}, 'paused')" title="停止">⏹</button>`;
                 actions += `<button class="complete" onclick="changeStatus(${task.id}, 'completed')" title="完了">✓</button>`;
             } else if (task.status === 'paused') {
-                actions += `<button class="start" onclick="changeStatus(${task.id}, 'progress')" title="再開">▷</button>`;
+                actions += `<button class="resume" onclick="changeStatus(${task.id}, 'progress')" title="再開">▶️</button>`;
             } else if (task.status === 'completed') {
                 actions += `<button class="back" onclick="changeStatus(${task.id}, 'todo')" title="再開">↻</button>`;
             }
