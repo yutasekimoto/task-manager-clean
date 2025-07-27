@@ -766,9 +766,16 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                 if (!selectedDate) return [];
                 
                 filtered = tasks.filter(t => {
-                    if (!t.scheduledDate) return false;
-                    const taskDate = new Date(t.scheduledDate).toISOString().split('T')[0];
-                    return taskDate === selectedDate;
+                    // 日付未設定でも進行中または停止中のタスクは表示
+                    if (!t.scheduledDate && (t.status === 'progress' || t.status === 'paused')) {
+                        return true;
+                    }
+                    // 日付設定済みのタスクは選択日と一致するもののみ
+                    if (t.scheduledDate) {
+                        const taskDate = new Date(t.scheduledDate).toISOString().split('T')[0];
+                        return taskDate === selectedDate;
+                    }
+                    return false;
                 });
             } else {
                 // 全タスクビューの場合
