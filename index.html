@@ -167,7 +167,7 @@
             </div>
             <div class="memo-content">
                 <div class="schedule-section">
-                    <h4>🗺️ 実施予定日時</h4>
+                    <h4>📅 実施予定日時</h4>
                     <div class="schedule-inputs">
                         <input type="date" id="scheduleDate" min="" />
                         <input type="time" id="scheduleTime" />
@@ -1246,7 +1246,7 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                     <div class="task-content">
                         <div class="task-text" ${isMobile ? `ontouchend="handleTaskTextTouch(${task.id}, event)"` : `onclick="editTaskName(${task.id}, event)"`} title="${isMobile ? 'ダブルタップで編集' : 'クリックして編集'}">
                             ${task.text}
-                            ${task.scheduledDate ? `<span class="schedule-icon" title="予定: ${formatScheduleDate(task.scheduledDate)}">🗺️</span>` : ''}
+                            ${task.scheduledDate ? `<span class="schedule-icon" title="予定: ${formatScheduleDate(task.scheduledDate)}">📅</span>` : ''}
                         </div>
                     </div>
                     <div class="memo-icon ${task.memo && task.memo.trim() ? 'has-memo' : ''}" onclick="handleMemoClick(${task.id}, event)" title="メモを編集">📝</div>
