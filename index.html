@@ -72,6 +72,8 @@
         .task-actions .pause:hover { background: #d1ecf1; }
         .task-actions .resume { color: #28a745; }
         .task-actions .resume:hover { background: #d4edda; }
+        .task-actions .move-top { color: #6c757d; }
+        .task-actions .move-top:hover { background: #e9ecef; color: #495057; }
         .empty { text-align: center; padding: 40px; color: rgba(255,255,255,0.8); }
         .sync-indicator { 
             position: fixed; 
@@ -598,13 +600,17 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                 return;
             }
 
+            // 未着手タスクの最小のorder値を取得して、さらに1小さい値を設定
+            const todoTasks = tasks.filter(t => t.status === 'todo');
+            const minOrder = todoTasks.length > 0 ? Math.min(...todoTasks.map(t => t.order || 0)) : 0;
+            
             const task = {
                 id: Date.now(),
                 text: text,
                 status: 'todo',
                 createdAt: new Date().toISOString(),
                 completedAt: null,
-                order: tasks.length,
+                order: minOrder - 1, // 未着手の一番上に
                 memo: '',
                 scheduledDate: null
             };
@@ -621,6 +627,27 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
             scheduleBatchSync();
         }
 
+        function moveToTop(taskId) {
+            const taskIndex = tasks.findIndex(t => t.id === taskId);
+            if (taskIndex === -1) return;
+            
+            const task = tasks[taskIndex];
+            if (task.status !== 'todo') return; // 未着手のみ
+            
+            // 未着手タスクの中で最小のorder値を取得
+            const todoTasks = tasks.filter(t => t.status === 'todo');
+            const minOrder = Math.min(...todoTasks.map(t => t.order || 0));
+            
+            // さらに1小さい値を設定して一番上に
+            task.order = minOrder - 1;
+            
+            pendingSync.add(taskId);
+            scheduleBatchSync();
+            renderTasks();
+            
+            console.log(`タスク "${task.text}" を一番上に移動`);
+        }
+        
         async function changeStatus(id, newStatus) {
             console.log('ステータス変更:', id, newStatus);
             
@@ -636,6 +663,14 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                 task.completedAt = new Date().toISOString();
             } else {
                 task.completedAt = null;
+            }
+            
+            // 進行中または停止中から未着手に戻す場合、未着手の一番上に移動
+            if (newStatus === 'todo') {
+                const todoTasks = tasks.filter(t => t.status === 'todo' && t.id !== id);
+                const minOrder = todoTasks.length > 0 ? Math.min(...todoTasks.map(t => t.order || 0)) : 0;
+                task.order = minOrder - 1;
+                console.log(`タスク "${task.text}" を未着手の一番上に移動`);
             }
             
             renderTasks();
@@ -1341,6 +1376,7 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
             let actions = '';
             
             if (task.status === 'todo') {
+                actions += `<button class="move-top" onclick="moveToTop(${task.id})" title="一番上へ">↑</button>`;
                 actions += `<button class="start" onclick="changeStatus(${task.id}, 'progress')" title="開始">▷</button>`;
                 actions += `<button class="complete" onclick="changeStatus(${task.id}, 'completed')" title="完了">✓</button>`;
             } else if (task.status === 'progress') {
