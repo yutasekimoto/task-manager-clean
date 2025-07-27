@@ -600,7 +600,7 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                 return;
             }
 
-            // 未着手タスクの最小のorder値を取得して、さらに1小さい値を設定
+            // 未着手タスクの最小のorder値を取得して、さらに10小さい値を設定
             const todoTasks = tasks.filter(t => t.status === 'todo');
             const minOrder = todoTasks.length > 0 ? Math.min(...todoTasks.map(t => t.order || 0)) : 0;
             
@@ -610,7 +610,7 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                 status: 'todo',
                 createdAt: new Date().toISOString(),
                 completedAt: null,
-                order: minOrder - 1, // 未着手の一番上に
+                order: minOrder - 10, // 未着手の一番上に
                 memo: '',
                 scheduledDate: null
             };
@@ -634,18 +634,24 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
             const task = tasks[taskIndex];
             if (task.status !== 'todo') return; // 未着手のみ
             
-            // 未着手タスクの中で最小のorder値を取得
-            const todoTasks = tasks.filter(t => t.status === 'todo');
-            const minOrder = Math.min(...todoTasks.map(t => t.order || 0));
+            // 未着手タスクの中で最小のorder値を取得（対象タスクは除く）
+            const todoTasks = tasks.filter(t => t.status === 'todo' && t.id !== taskId);
+            let minOrder;
             
-            // さらに1小さい値を設定して一番上に
-            task.order = minOrder - 1;
+            if (todoTasks.length > 0) {
+                minOrder = Math.min(...todoTasks.map(t => t.order || 0));
+                // さらに10小さい値を設定して確実に一番上に
+                task.order = minOrder - 10;
+            } else {
+                // 他に未着手タスクがない場合
+                task.order = -10;
+            }
             
             pendingSync.add(taskId);
             scheduleBatchSync();
             renderTasks();
             
-            console.log(`タスク "${task.text}" を一番上に移動`);
+            console.log(`タスク "${task.text}" を一番上に移動 (order: ${task.order})`);
         }
         
         async function changeStatus(id, newStatus) {
@@ -669,8 +675,8 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
             if (newStatus === 'todo') {
                 const todoTasks = tasks.filter(t => t.status === 'todo' && t.id !== id);
                 const minOrder = todoTasks.length > 0 ? Math.min(...todoTasks.map(t => t.order || 0)) : 0;
-                task.order = minOrder - 1;
-                console.log(`タスク "${task.text}" を未着手の一番上に移動`);
+                task.order = minOrder - 10;
+                console.log(`タスク "${task.text}" を未着手の一番上に移動 (order: ${task.order})`);
             }
             
             renderTasks();
