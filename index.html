@@ -1378,7 +1378,6 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
             if (task.status === 'todo') {
                 actions += `<button class="move-top" onclick="moveToTop(${task.id})" title="一番上へ">↑</button>`;
                 actions += `<button class="start" onclick="changeStatus(${task.id}, 'progress')" title="開始">▷</button>`;
-                actions += `<button class="complete" onclick="changeStatus(${task.id}, 'completed')" title="完了">✓</button>`;
             } else if (task.status === 'progress') {
                 actions += `<button class="pause" onclick="changeStatus(${task.id}, 'paused')" title="停止">⏹</button>`;
                 actions += `<button class="complete" onclick="changeStatus(${task.id}, 'completed')" title="完了">✓</button>`;
