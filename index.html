@@ -982,10 +982,10 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
         }
 
         function handleTouchEnd(e) {
-            // 確実にクリーンアップ
-            cleanupDragState();
-            
-            if (!isTouching || draggedTaskIndex === null) return;
+            if (!isTouching || draggedTaskIndex === null) {
+                cleanupDragState();
+                return;
+            }
             
             const draggedElement = document.querySelector('.task.dragging');
             if (draggedElement) {
@@ -993,26 +993,38 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                 
                 const moveDistance = touchCurrentY - touchStartY;
                 
-                // より感度の良いドロップ処理
+                // ドロップ処理の実行
                 if (Math.abs(moveDistance) > 20) {
                     const taskHeight = 60;
                     const moveSteps = Math.round(moveDistance / taskHeight);
                     const filteredTasks = getFilteredTasks();
                     const newIndex = Math.max(0, Math.min(filteredTasks.length - 1, draggedTaskIndex + moveSteps));
                     
+                    console.log('ドラッグ終了:', draggedTaskIndex, '->', newIndex, '移動距離:', moveDistance);
+                    
                     if (newIndex !== draggedTaskIndex) {
                         handleDropLogic(draggedTaskIndex, newIndex);
                         navigator.vibrate && navigator.vibrate(100); // 成功時の振動フィードバック
+                        console.log('並び替え実行済み');
+                    } else {
+                        console.log('並び替えなし（同じ位置）');
                     }
+                } else {
+                    console.log('移動距離不足:', moveDistance);
                 }
             }
             
+            // クリーンアップを最後に実行
             cleanupDragState();
         }
         
         function cleanupDragState() {
+            console.log('クリーンアップ実行');
+            
             isTouching = false;
             draggedTaskIndex = null;
+            touchStartY = 0;
+            touchCurrentY = 0;
             
             // 全てのドラッグ関連クラスとスタイルをクリア
             document.querySelectorAll('.task').forEach(task => {
@@ -1048,17 +1060,24 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
         }
 
         function handleDropLogic(fromIndex, toIndex) {
+            console.log('並び替えロジック開始:', fromIndex, '->', toIndex);
+            
             const filtered = getFilteredTasks();
             const draggedTask = filtered[fromIndex];
             const dropTask = filtered[toIndex];
             
+            console.log('ドラッグタスク:', draggedTask?.text, 'ドロップタスク:', dropTask?.text);
+            
             if (!draggedTask || !dropTask) {
+                console.log('タスクが見つからない');
                 return;
             }
             
             // 簡素化した並び替えロジック
             const draggedTaskId = draggedTask.id;
             const allTasks = [...tasks];
+            
+            console.log('並び替え前のタスク数:', allTasks.length);
             
             // 元の配列からドラッグされたタスクを削除
             const draggedOriginalIndex = allTasks.findIndex(t => t.id === draggedTaskId);
@@ -1075,10 +1094,15 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
             
             tasks = allTasks;
             
+            console.log('並び替え後のタスク数:', tasks.length);
+            console.log('レンダリング開始');
+            
             renderTasks();
             
             pendingSync.add(draggedTaskId);
             scheduleBatchSync();
+            
+            console.log('並び替え完了');
         }
 
         function handleDragEnd(e) {
