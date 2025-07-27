@@ -650,7 +650,6 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
             overlay.classList.add('show');
             setTimeout(() => {
                 editorElement.focus();
-                setupMemoEditor();
             }, 100);
         }
         
@@ -658,6 +657,7 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
             const overlay = document.getElementById('memoOverlay');
             overlay.classList.remove('show');
             currentEditingMemo = null;
+            memoEditorSetup = false;
         }
         
         function saveMemo() {
@@ -699,10 +699,12 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
             editor.setSelectionRange(start + replacement.length, start + replacement.length);
         }
         
-        // メモエディターのキーイベント処理
+        // メモエディターのイベント処理
+        let memoEditorSetup = false;
+        
         function setupMemoEditor() {
             const editor = document.getElementById('memoEditor');
-            if (!editor) return;
+            if (!editor || memoEditorSetup) return;
             
             // チェックボックスのクリックイベント
             editor.addEventListener('click', function(e) {
@@ -747,8 +749,19 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                     const lines = this.value.substring(0, start).split('\n');
                     const currentLine = lines[lines.length - 1];
                     
+                    // 空のリスト項目の場合は継続しない
+                    if (currentLine === '\u2022 ' || currentLine === '\u2610 ' || currentLine.match(/^\d+\. $/)) {
+                        e.preventDefault();
+                        // 空のリスト項目を削除して通常の改行
+                        const beforeCursor = this.value.substring(0, start - currentLine.length);
+                        const afterCursor = this.value.substring(start);
+                        this.value = beforeCursor + '\n' + afterCursor;
+                        this.setSelectionRange(start - currentLine.length + 1, start - currentLine.length + 1);
+                        return;
+                    }
+                    
                     // 箇条書きの継続
-                    if (currentLine.match(/^\u2022 /)) {
+                    if (currentLine.match(/^\u2022 .+/)) {
                         e.preventDefault();
                         const afterCursor = this.value.substring(start);
                         this.value = this.value.substring(0, start) + '\n\u2022 ' + afterCursor;
@@ -757,7 +770,7 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                     }
                     
                     // 番号付きリストの継続
-                    const numberMatch = currentLine.match(/^(\d+)\. /);
+                    const numberMatch = currentLine.match(/^(\d+)\. .+/);
                     if (numberMatch) {
                         e.preventDefault();
                         const nextNumber = parseInt(numberMatch[1]) + 1;
@@ -769,7 +782,7 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                     }
                     
                     // チェックボックスの継続
-                    if (currentLine.match(/^[\u2610\u2611] /)) {
+                    if (currentLine.match(/^[\u2610\u2611] .+/)) {
                         e.preventDefault();
                         const afterCursor = this.value.substring(start);
                         this.value = this.value.substring(0, start) + '\n\u2610 ' + afterCursor;
@@ -778,6 +791,8 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                     }
                 }
             });
+            
+            memoEditorSetup = true;
         }
         
         // メモアイコンクリックハンドラ
@@ -1204,6 +1219,8 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                     userId = localStorage.getItem('todo_anon_user_id') || generateUserId();
                 }
                 loadTasks();
+                // メモエディターの初期設定
+                setupMemoEditor();
             }, 100);
         });
 
