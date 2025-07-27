@@ -1368,29 +1368,24 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                 return;
             }
             
-            // 簡素化した並び替えロジック
+            // ドラッグされたタスクの新しいorder値を計算
             const draggedTaskId = draggedTask.id;
-            const allTasks = [...tasks];
+            let newOrder;
             
-            console.log('並び替え前のタスク数:', allTasks.length);
+            if (fromIndex < toIndex) {
+                // 下に移動: ドロップ先タスクのorder + 1
+                newOrder = dropTask.order + 1;
+            } else {
+                // 上に移動: ドロップ先タスクのorder - 1
+                newOrder = dropTask.order - 1;
+            }
             
-            // 元の配列からドラッグされたタスクを削除
-            const draggedOriginalIndex = allTasks.findIndex(t => t.id === draggedTaskId);
-            const removedTask = allTasks.splice(draggedOriginalIndex, 1)[0];
-            
-            // 新しい位置に挿入
-            const dropOriginalIndex = allTasks.findIndex(t => t.id === dropTask.id);
-            allTasks.splice(dropOriginalIndex, 0, removedTask);
-            
-            // order値を再設定
-            allTasks.forEach((task, index) => {
-                task.order = index;
-            });
-            
-            tasks = allTasks;
-            
-            console.log('並び替え後のタスク数:', tasks.length);
-            console.log('レンダリング開始');
+            // ドラッグされたタスクのorder値を更新
+            const draggedTaskInTasks = tasks.find(t => t.id === draggedTaskId);
+            if (draggedTaskInTasks) {
+                draggedTaskInTasks.order = newOrder;
+                console.log(`タスク "${draggedTaskInTasks.text}" のorderを ${newOrder} に変更`);
+            }
             
             renderTasks();
             
