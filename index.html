@@ -784,12 +784,12 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
             }
             
             return filtered.sort((a, b) => {
-                // 進行中を一番上に
-                if (a.status === 'progress' && b.status !== 'progress') return -1;
-                if (b.status === 'progress' && a.status !== 'progress') return 1;
-                // 停止中を次に
-                if (a.status === 'paused' && b.status !== 'paused' && b.status !== 'progress') return -1;
-                if (b.status === 'paused' && a.status !== 'paused' && a.status !== 'progress') return 1;
+                // 停止中を一番上に
+                if (a.status === 'paused' && b.status !== 'paused') return -1;
+                if (b.status === 'paused' && a.status !== 'paused') return 1;
+                // 進行中を次に
+                if (a.status === 'progress' && b.status !== 'progress' && b.status !== 'paused') return -1;
+                if (b.status === 'progress' && a.status !== 'progress' && a.status !== 'paused') return 1;
                 return (a.order || 0) - (b.order || 0);
             });
         }
