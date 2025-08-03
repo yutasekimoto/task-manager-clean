@@ -1,0 +1,1551 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FitTracker</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="FitTracker">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; 
+            background: linear-gradient(135deg, #2d5a27 0%, #1e3f1a 100%); 
+            min-height: 100vh; 
+            padding: 20px; 
+        }
+        .container { max-width: 500px; margin: 0 auto; }
+        .header { text-align: center; color: white; margin-bottom: 30px; position: relative; }
+        .header h1 { font-size: 2.5em; margin-bottom: 10px; }
+        .version { position: absolute; top: 0; right: 0; font-size: 0.8em; color: rgba(255,255,255,0.7); }
+        
+        .nav-tabs { 
+            display: flex; 
+            background: rgba(255,255,255,0.1); 
+            border-radius: 15px; 
+            margin-bottom: 25px; 
+            overflow: hidden;
+        }
+        .nav-tab { 
+            flex: 1; 
+            padding: 15px 10px; 
+            text-align: center; 
+            color: white; 
+            background: none; 
+            border: none; 
+            cursor: pointer; 
+            transition: all 0.2s ease;
+            font-size: 14px;
+        }
+        .nav-tab.active { 
+            background: rgba(255,255,255,0.9); 
+            color: #2d5a27; 
+            font-weight: bold;
+        }
+        
+        .content { 
+            background: rgba(255,255,255,0.95); 
+            border-radius: 20px; 
+            padding: 25px; 
+            min-height: 400px;
+        }
+        
+        .date-header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        .date-header h2 {
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .date-header .weekday {
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+        }
+        .section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        
+        .exercise-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .exercise-item {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            transition: all 0.2s ease;
+        }
+        .exercise-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .exercise-item.completed {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+        }
+        .exercise-item.scheduled {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+        }
+        
+        .exercise-checkbox {
+            width: 20px;
+            height: 20px;
+            margin-right: 15px;
+            cursor: pointer;
+        }
+        .exercise-name {
+            flex: 1;
+            font-weight: 500;
+            color: #333;
+        }
+        .exercise-info {
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        .exercise-actions {
+            display: flex;
+            gap: 8px;
+            margin-left: 10px;
+        }
+        .exercise-edit {
+            background: #ffc107;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        .exercise-delete {
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        .management-item {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            transition: all 0.2s ease;
+        }
+        .management-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .empty {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        /* モーダル */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            animation: fadeIn 0.3s;
+        }
+        .modal-content {
+            background-color: white;
+            margin: 10% auto;
+            padding: 0;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            animation: slideIn 0.3s;
+        }
+        .modal-header {
+            padding: 20px 25px 15px;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-title {
+            margin: 0;
+            color: #333;
+            font-size: 1.2em;
+        }
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-close:hover {
+            background: #f8f9fa;
+        }
+        .modal-body {
+            padding: 25px;
+        }
+        .detail-section {
+            margin-bottom: 20px;
+        }
+        .detail-label {
+            font-weight: bold;
+            color: #495057;
+            margin-bottom: 8px;
+        }
+        .detail-content {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 8px;
+            line-height: 1.5;
+            color: #333;
+        }
+        .detail-content.empty {
+            color: #999;
+            font-style: italic;
+        }
+        .video-link {
+            display: inline-block;
+            background: #ff4444;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 14px;
+            margin-top: 8px;
+        }
+        .video-link:hover {
+            background: #cc3333;
+        }
+        .steps-list {
+            margin: 0;
+            padding-left: 20px;
+        }
+        .steps-list li {
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes slideIn {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        /* フォーム */
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #495057;
+        }
+        .form-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.2s ease;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+        }
+        .form-textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+        .form-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s ease;
+        }
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+        
+        /* スケジュール管理 */
+        .day-schedule {
+            margin-bottom: 25px;
+            border: 1px solid #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .day-header {
+            background: #f8f9fa;
+            padding: 15px 20px;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .day-name {
+            font-weight: bold;
+            color: #495057;
+            font-size: 1.1em;
+        }
+        .add-exercise-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .day-exercises {
+            padding: 15px 20px;
+        }
+        .schedule-exercise {
+            display: flex;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #f8f9fa;
+        }
+        .schedule-exercise:last-child {
+            border-bottom: none;
+        }
+        .schedule-exercise-name {
+            flex: 1;
+            color: #495057;
+        }
+        .remove-exercise-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            font-size: 10px;
+        }
+        .day-empty {
+            color: #999;
+            font-style: italic;
+            padding: 10px 0;
+        }
+        
+        /* 統計 */
+        .stat-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            border-left: 4px solid #007bff;
+        }
+        .stat-exercise-name {
+            font-weight: bold;
+            color: #495057;
+            margin-bottom: 8px;
+        }
+        .stat-progress {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .stat-bar {
+            flex: 1;
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-right: 10px;
+        }
+        .stat-bar-fill {
+            height: 100%;
+            background: #28a745;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .stat-text {
+            font-size: 14px;
+            color: #6c757d;
+        }
+        .record-item {
+            background: #f8f9fa;
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .record-date {
+            font-weight: bold;
+            color: #495057;
+        }
+        .record-exercises {
+            font-size: 14px;
+            color: #6c757d;
+        }
+        .record-count {
+            background: #007bff;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>FitTracker</h1>
+            <div class="version">v1.0.0</div>
+        </div>
+
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="showTab('daily')">今日の記録</button>
+            <button class="nav-tab" onclick="showTab('exercises')">種目管理</button>
+            <button class="nav-tab" onclick="showTab('schedule')">スケジュール</button>
+            <button class="nav-tab" onclick="showTab('history')">履歴</button>
+        </div>
+
+        <div class="content">
+            <!-- 今日の記録タブ -->
+            <div id="daily-tab" class="tab-content">
+                <div class="date-header">
+                    <h2 id="current-date"></h2>
+                    <div class="weekday" id="current-weekday"></div>
+                </div>
+
+                <div class="section">
+                    <h3>今日の予定</h3>
+                    <div class="exercise-list" id="scheduled-exercises">
+                        <!-- 今日の予定がここに動的に表示される -->
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h3>その他の種目</h3>
+                    <div class="exercise-list" id="other-exercises">
+                        <!-- その他の種目がここに動的に表示される -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 種目管理タブ -->
+            <div id="exercises-tab" class="tab-content" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3 style="margin: 0;">種目管理</h3>
+                    <button onclick="openAddExerciseModal()" style="background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold;">+ 新規追加</button>
+                </div>
+                
+                <div id="exercises-list" class="exercise-list">
+                    <!-- 運動種目一覧がここに表示される -->
+                </div>
+            </div>
+
+            <!-- スケジュールタブ -->
+            <div id="schedule-tab" class="tab-content" style="display: none;">
+                <h3 style="margin-bottom: 20px;">曜日別スケジュール</h3>
+                
+                <div id="schedule-management">
+                    <!-- 曜日別スケジュールがここに表示される -->
+                </div>
+            </div>
+
+            <!-- 履歴タブ -->
+            <div id="history-tab" class="tab-content" style="display: none;">
+                <h3 style="margin-bottom: 20px;">履歴・統計</h3>
+                
+                <div class="section">
+                    <h4 style="margin-bottom: 15px; color: #495057;">今月の実施率</h4>
+                    <div id="monthly-stats">
+                        <!-- 月間統計がここに表示される -->
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <h4 style="margin-bottom: 15px; color: #495057;">最近の記録</h4>
+                    <div id="recent-records">
+                        <!-- 最近の記録がここに表示される -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 運動詳細モーダル -->
+    <div id="exerciseModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">運動詳細</h3>
+                <button class="modal-close" onclick="closeExerciseModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="detail-section">
+                    <div class="detail-label">説明</div>
+                    <div class="detail-content" id="modalDescription">
+                        説明がありません
+                    </div>
+                </div>
+                
+                <div class="detail-section">
+                    <div class="detail-label">手順</div>
+                    <div class="detail-content" id="modalSteps">
+                        手順が登録されていません
+                    </div>
+                </div>
+                
+                <div class="detail-section">
+                    <div class="detail-label">参考動画</div>
+                    <div class="detail-content" id="modalVideo">
+                        動画が登録されていません
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 種目追加・編集モーダル -->
+    <div id="exerciseFormModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="formModalTitle">新しい運動を追加</h3>
+                <button class="modal-close" onclick="closeExerciseFormModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="exerciseForm">
+                    <div class="form-group">
+                        <label class="form-label" for="exerciseName">運動名 *</label>
+                        <input type="text" id="exerciseName" class="form-input" required placeholder="例: プランク">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="exerciseDescription">説明</label>
+                        <textarea id="exerciseDescription" class="form-input form-textarea" placeholder="運動の効果や特徴を説明してください"></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="exerciseSteps">手順</label>
+                        <textarea id="exerciseSteps" class="form-input form-textarea" placeholder="1. 最初の手順&#10;2. 次の手順&#10;3. ..."></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="exerciseVideoUrl">参考動画URL</label>
+                        <input type="url" id="exerciseVideoUrl" class="form-input" placeholder="https://www.youtube.com/watch?v=...">
+                    </div>
+                    
+                    <div class="form-buttons">
+                        <button type="submit" class="btn btn-primary">保存</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeExerciseFormModal()">キャンセル</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 運動選択モーダル -->
+    <div id="exerciseSelectModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="selectModalTitle">運動を選択</h3>
+                <button class="modal-close" onclick="closeExerciseSelectModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="exercise-select-list">
+                    <!-- 選択可能な運動一覧がここに表示される -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script>
+        console.log('FitTracker v1.0.0 開始');
+        
+        // Supabase設定
+        let supabase = null;
+        
+        try {
+            const SUPABASE_URL = 'https://hsekpmpboawozvuwscf.supabase.co';
+            const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhzZWtwbXBib2F3b3p2dXdzY2YiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTczNjI2MjEzOCwiZXhwIjoyMDUxODM4MTM4fQ.GwYmQGdFw0f6Zv8iLUcRgf6rF2wX5zBpzF2_A9xAP7s';
+            
+            if (window.supabase && window.supabase.createClient) {
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                console.log('Supabase初期化成功');
+            } else {
+                console.warn('Supabaseライブラリが読み込まれていません');
+            }
+        } catch (error) {
+            console.error('Supabase初期化エラー:', error);
+        }
+
+        // アプリケーション状態
+        let currentTab = 'daily';
+        let exercises = [];
+        let schedule = {};
+        let records = {};
+        let userId = localStorage.getItem('fittracker_user_id') || generateUserId();
+        let isInitialized = false;
+        let editingExerciseId = null;
+        let selectedDayOfWeek = null;
+        let monthlyStats = {};
+        let recentRecords = [];
+
+        // タブ切り替え
+        function showTab(tabName) {
+            currentTab = tabName;
+            
+            // タブボタンの状態更新
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // タブコンテンツの表示切り替え
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.style.display = 'none';
+            });
+            document.getElementById(tabName + '-tab').style.display = 'block';
+            
+            // 種目管理タブの場合は一覧を更新
+            if (tabName === 'exercises') {
+                renderExercisesManagement();
+            } else if (tabName === 'schedule') {
+                renderScheduleManagement();
+            } else if (tabName === 'history') {
+                loadHistoryData();
+            }
+            
+            console.log('タブ切り替え:', tabName);
+        }
+
+        // 日付フォーマット
+        function formatDate(date) {
+            const year = date.getFullYear();
+            const month = date.getMonth() + 1;
+            const day = date.getDate();
+            const weekdays = ['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'];
+            const weekday = weekdays[date.getDay()];
+            
+            return {
+                dateString: `${year}年${month}月${day}日`,
+                weekday: weekday
+            };
+        }
+
+        function generateUserId() {
+            const id = 'fittracker_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('fittracker_user_id', id);
+            return id;
+        }
+
+        // データベース初期化
+        async function initializeUserData() {
+            if (!supabase || isInitialized) return;
+            
+            try {
+                // 既存の運動種目をチェック
+                const { data: existingExercises } = await supabase
+                    .from('exercises')
+                    .select('*')
+                    .eq('user_id', userId);
+
+                if (!existingExercises || existingExercises.length === 0) {
+                    console.log('初期データを作成中...');
+                    
+                    // 初期運動種目を作成
+                    const initialExercises = [
+                        { 
+                            user_id: userId, 
+                            name: 'スクワット', 
+                            description: '下半身を鍛える基本的な運動です。太ももやお尻の筋肉を効果的に鍛えられます。', 
+                            steps: '1. 足を肩幅に開く\n2. 背筋を伸ばし、胸を張る\n3. お尻を後ろに引きながらゆっくりしゃがむ\n4. 太ももが床と平行になるまで下げる\n5. かかとで床を押すようにして立ち上がる', 
+                            video_url: 'https://www.youtube.com/watch?v=aclHkVaku9U',
+                            order_index: 1 
+                        },
+                        { 
+                            user_id: userId, 
+                            name: '懸垂', 
+                            description: '上半身（特に背筋）を鍛える運動です。広背筋や上腕二頭筋に効果的です。', 
+                            steps: '1. 鉄棒を肩幅よりやや広めに握る\n2. 肩甲骨を寄せて胸を張る\n3. あごがバーの高さまで体を引き上げる\n4. ゆっくりと元の位置に戻る\n5. 反動を使わず筋力で行う', 
+                            video_url: 'https://www.youtube.com/watch?v=eGo4IYlbE5g',
+                            order_index: 2 
+                        },
+                        { 
+                            user_id: userId, 
+                            name: 'ダンベル上半身（プレス／ロー／レイズ）', 
+                            description: 'ダンベルを使った上半身トレーニングです。胸筋、背筋、肩の筋肉をバランスよく鍛えます。', 
+                            steps: '【プレス】\n1. ベンチに仰向けになる\n2. ダンベルを胸の上で構える\n3. ゆっくり胸まで下ろす\n4. 胸筋を意識して押し上げる\n\n【ロー】\n1. 前傾姿勢でダンベルを持つ\n2. 肘を後ろに引く\n3. 肩甲骨を寄せる\n\n【レイズ】\n1. ダンベルを体の横で持つ\n2. 肩の高さまで持ち上げる', 
+                            video_url: 'https://www.youtube.com/watch?v=gRVjAtPip0Y',
+                            order_index: 3 
+                        },
+                        { 
+                            user_id: userId, 
+                            name: 'ランニング', 
+                            description: '有酸素運動で心肺機能を向上させます。持久力向上とカロリー消費に効果的です。', 
+                            steps: '1. 軽いストレッチでウォーミングアップ\n2. ゆっくりとしたペースで開始\n3. 呼吸を意識して一定のリズムを保つ\n4. 足音を小さくして着地\n5. 疲れたら歩きを挟む\n6. クールダウンのストレッチ', 
+                            video_url: 'https://www.youtube.com/watch?v=9L2b2khySLE',
+                            order_index: 4 
+                        },
+                        { 
+                            user_id: userId, 
+                            name: 'ドローイング（朝）', 
+                            description: '朝のドローイング（腹筋運動）です。お腹をへこませることで深層筋を鍛えます。', 
+                            steps: '1. 仰向けに寝るか立った状態で\n2. 鼻から息をゆっくり吸う\n3. 口から息を吐きながらお腹をへこませる\n4. お腹をへこませたまま30秒キープ\n5. ゆっくり息を吸ってリラックス\n6. 3-5セット繰り返す', 
+                            video_url: 'https://www.youtube.com/watch?v=pAecrJq3tiI',
+                            order_index: 5 
+                        },
+                        { 
+                            user_id: userId, 
+                            name: 'ドローイング（夜）', 
+                            description: '夜のドローイング（腹筋運動）です。一日の終わりに体幹を整えます。', 
+                            steps: '1. リラックスした状態で行う\n2. 鼻から深く息を吸う\n3. 口から長く息を吐きながらお腹をへこませる\n4. お腹をへこませたまま20-30秒キープ\n5. ゆっくり息を吸って元に戻す\n6. 就寝前のリラックス効果も期待', 
+                            video_url: 'https://www.youtube.com/watch?v=pAecrJq3tiI',
+                            order_index: 6 
+                        }
+                    ];
+
+                    const { data: createdExercises, error: exerciseError } = await supabase
+                        .from('exercises')
+                        .insert(initialExercises)
+                        .select();
+
+                    if (exerciseError) {
+                        console.error('初期運動種目作成エラー:', exerciseError);
+                        return;
+                    }
+
+                    // 初期スケジュールを作成
+                    const exerciseMap = {};
+                    createdExercises.forEach(ex => {
+                        exerciseMap[ex.name] = ex.id;
+                    });
+
+                    const initialSchedule = [
+                        // 月曜日：懸垂、スクワット、ドローイング
+                        { user_id: userId, day_of_week: 1, exercise_id: exerciseMap['懸垂'] },
+                        { user_id: userId, day_of_week: 1, exercise_id: exerciseMap['スクワット'] },
+                        { user_id: userId, day_of_week: 1, exercise_id: exerciseMap['ドローイング（朝）'] },
+                        { user_id: userId, day_of_week: 1, exercise_id: exerciseMap['ドローイング（夜）'] },
+                        
+                        // 火曜日：ランニング、ドローイング
+                        { user_id: userId, day_of_week: 2, exercise_id: exerciseMap['ランニング'] },
+                        { user_id: userId, day_of_week: 2, exercise_id: exerciseMap['ドローイング（朝）'] },
+                        { user_id: userId, day_of_week: 2, exercise_id: exerciseMap['ドローイング（夜）'] },
+                        
+                        // 水曜日：ダンベル上半身、ドローイング
+                        { user_id: userId, day_of_week: 3, exercise_id: exerciseMap['ダンベル上半身（プレス／ロー／レイズ）'] },
+                        { user_id: userId, day_of_week: 3, exercise_id: exerciseMap['ドローイング（朝）'] },
+                        { user_id: userId, day_of_week: 3, exercise_id: exerciseMap['ドローイング（夜）'] },
+                        
+                        // 木曜日：懸垂、スクワット、ドローイング
+                        { user_id: userId, day_of_week: 4, exercise_id: exerciseMap['懸垂'] },
+                        { user_id: userId, day_of_week: 4, exercise_id: exerciseMap['スクワット'] },
+                        { user_id: userId, day_of_week: 4, exercise_id: exerciseMap['ドローイング（朝）'] },
+                        { user_id: userId, day_of_week: 4, exercise_id: exerciseMap['ドローイング（夜）'] },
+                        
+                        // 金曜日：ランニング、ドローイング
+                        { user_id: userId, day_of_week: 5, exercise_id: exerciseMap['ランニング'] },
+                        { user_id: userId, day_of_week: 5, exercise_id: exerciseMap['ドローイング（朝）'] },
+                        { user_id: userId, day_of_week: 5, exercise_id: exerciseMap['ドローイング（夜）'] },
+                        
+                        // 土曜日：スクワット、ドローイング
+                        { user_id: userId, day_of_week: 6, exercise_id: exerciseMap['スクワット'] },
+                        { user_id: userId, day_of_week: 6, exercise_id: exerciseMap['ドローイング（朝）'] },
+                        { user_id: userId, day_of_week: 6, exercise_id: exerciseMap['ドローイング（夜）'] },
+                        
+                        // 日曜日：スクワット、ドローイング
+                        { user_id: userId, day_of_week: 0, exercise_id: exerciseMap['スクワット'] },
+                        { user_id: userId, day_of_week: 0, exercise_id: exerciseMap['ドローイング（朝）'] },
+                        { user_id: userId, day_of_week: 0, exercise_id: exerciseMap['ドローイング（夜）'] }
+                    ];
+
+                    const { error: scheduleError } = await supabase
+                        .from('schedules')
+                        .insert(initialSchedule);
+
+                    if (scheduleError) {
+                        console.error('初期スケジュール作成エラー:', scheduleError);
+                    } else {
+                        console.log('初期データ作成完了');
+                    }
+                }
+                
+                isInitialized = true;
+            } catch (error) {
+                console.error('データ初期化エラー:', error);
+            }
+        }
+
+        // データ読み込み
+        async function loadData() {
+            try {
+                // 運動種目を読み込み
+                const { data: exerciseData, error: exerciseError } = await supabase
+                    .from('exercises')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .order('order_index');
+
+                if (exerciseError) {
+                    console.error('運動種目読み込みエラー:', exerciseError);
+                } else {
+                    exercises = exerciseData || [];
+                }
+
+                // スケジュールを読み込み
+                const { data: scheduleData, error: scheduleError } = await supabase
+                    .from('schedules')
+                    .select('*, exercises(*)')
+                    .eq('user_id', userId);
+
+                if (scheduleError) {
+                    console.error('スケジュール読み込みエラー:', scheduleError);
+                } else {
+                    schedule = {};
+                    scheduleData?.forEach(item => {
+                        if (!schedule[item.day_of_week]) {
+                            schedule[item.day_of_week] = [];
+                        }
+                        schedule[item.day_of_week].push(item.exercises);
+                    });
+                }
+
+                // 今日の記録を読み込み
+                await loadTodayRecords();
+                
+                // 画面を更新
+                renderDailyView();
+                
+                console.log('データ読み込み完了');
+            } catch (error) {
+                console.error('データ読み込みエラー:', error);
+            }
+        }
+
+        // 今日の記録を読み込み
+        async function loadTodayRecords() {
+            const today = new Date().toISOString().split('T')[0];
+            
+            try {
+                const { data, error } = await supabase
+                    .from('exercise_records')
+                    .select('*')
+                    .eq('user_id', userId)
+                    .eq('record_date', today);
+
+                if (error) {
+                    console.error('今日の記録読み込みエラー:', error);
+                } else {
+                    records[today] = {};
+                    data?.forEach(record => {
+                        records[today][record.exercise_id] = record.completed;
+                    });
+                }
+            } catch (error) {
+                console.error('今日の記録読み込みエラー:', error);
+            }
+        }
+
+        // 運動完了状態を切り替え
+        async function toggleExercise(exerciseId, isCompleted) {
+            const today = new Date().toISOString().split('T')[0];
+            
+            try {
+                if (!records[today]) {
+                    records[today] = {};
+                }
+                
+                records[today][exerciseId] = isCompleted;
+
+                // データベースに保存
+                const recordData = {
+                    user_id: userId,
+                    exercise_id: exerciseId,
+                    record_date: today,
+                    completed: isCompleted,
+                    completed_at: isCompleted ? new Date().toISOString() : null
+                };
+
+                const { error } = await supabase
+                    .from('exercise_records')
+                    .upsert(recordData, { 
+                        onConflict: 'user_id,exercise_id,record_date' 
+                    });
+
+                if (error) {
+                    console.error('記録保存エラー:', error);
+                    // エラーの場合は状態を戻す
+                    records[today][exerciseId] = !isCompleted;
+                } else {
+                    console.log('記録保存成功:', exerciseId, isCompleted);
+                }
+                
+                renderDailyView();
+            } catch (error) {
+                console.error('運動記録エラー:', error);
+            }
+        }
+
+        // 今日のビューを描画
+        function renderDailyView() {
+            const today = new Date();
+            const { dateString, weekday } = formatDate(today);
+            const dayOfWeek = today.getDay();
+            
+            document.getElementById('current-date').textContent = dateString;
+            document.getElementById('current-weekday').textContent = weekday;
+
+            // 今日の予定
+            const scheduledExercises = schedule[dayOfWeek] || [];
+            const scheduledContainer = document.getElementById('scheduled-exercises');
+            
+            if (scheduledExercises.length > 0) {
+                scheduledContainer.innerHTML = scheduledExercises.map(exercise => {
+                    const isCompleted = records[today.toISOString().split('T')[0]]?.[exercise.id] || false;
+                    return `
+                        <div class="exercise-item ${isCompleted ? 'completed' : 'scheduled'}">
+                            <input type="checkbox" class="exercise-checkbox" 
+                                   ${isCompleted ? 'checked' : ''} 
+                                   onchange="toggleExercise(${exercise.id}, this.checked)">
+                            <div class="exercise-name">${exercise.name}</div>
+                            <button class="exercise-info" title="詳細を見る" onclick="showExerciseInfo(${exercise.id})">i</button>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                scheduledContainer.innerHTML = '<div class="empty">今日の予定はありません</div>';
+            }
+
+            // その他の種目
+            const otherExercises = exercises.filter(ex => 
+                !scheduledExercises.some(scheduled => scheduled.id === ex.id)
+            );
+            const otherContainer = document.getElementById('other-exercises');
+            
+            if (otherExercises.length > 0) {
+                otherContainer.innerHTML = otherExercises.map(exercise => {
+                    const isCompleted = records[today.toISOString().split('T')[0]]?.[exercise.id] || false;
+                    return `
+                        <div class="exercise-item ${isCompleted ? 'completed' : ''}">
+                            <input type="checkbox" class="exercise-checkbox" 
+                                   ${isCompleted ? 'checked' : ''} 
+                                   onchange="toggleExercise(${exercise.id}, this.checked)">
+                            <div class="exercise-name">${exercise.name}</div>
+                            <button class="exercise-info" title="詳細を見る" onclick="showExerciseInfo(${exercise.id})">i</button>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                otherContainer.innerHTML = '<div class="empty">その他の種目はありません</div>';
+            }
+        }
+
+        // 運動詳細を表示
+        function showExerciseInfo(exerciseId) {
+            const exercise = exercises.find(ex => ex.id === exerciseId);
+            if (!exercise) return;
+
+            // モーダルのタイトルを設定
+            document.getElementById('modalTitle').textContent = exercise.name;
+            
+            // 説明を設定
+            const descriptionEl = document.getElementById('modalDescription');
+            if (exercise.description && exercise.description.trim()) {
+                descriptionEl.textContent = exercise.description;
+                descriptionEl.classList.remove('empty');
+            } else {
+                descriptionEl.textContent = '説明がありません';
+                descriptionEl.classList.add('empty');
+            }
+            
+            // 手順を設定
+            const stepsEl = document.getElementById('modalSteps');
+            if (exercise.steps && exercise.steps.trim()) {
+                const stepsList = exercise.steps.split('\n').filter(step => step.trim());
+                if (stepsList.length > 0) {
+                    stepsEl.innerHTML = `<ol class="steps-list">${stepsList.map(step => `<li>${step}</li>`).join('')}</ol>`;
+                    stepsEl.classList.remove('empty');
+                } else {
+                    stepsEl.textContent = '手順が登録されていません';
+                    stepsEl.classList.add('empty');
+                }
+            } else {
+                stepsEl.textContent = '手順が登録されていません';
+                stepsEl.classList.add('empty');
+            }
+            
+            // 動画リンクを設定
+            const videoEl = document.getElementById('modalVideo');
+            if (exercise.video_url && exercise.video_url.trim()) {
+                let videoHtml = `<div style="margin-bottom: 8px;">参考動画をご覧ください</div>`;
+                videoHtml += `<a href="${exercise.video_url}" target="_blank" class="video-link">YouTubeで見る</a>`;
+                videoEl.innerHTML = videoHtml;
+                videoEl.classList.remove('empty');
+            } else {
+                videoEl.textContent = '動画が登録されていません';
+                videoEl.classList.add('empty');
+            }
+            
+            // モーダルを表示
+            document.getElementById('exerciseModal').style.display = 'block';
+        }
+
+        // モーダルを閉じる
+        function closeExerciseModal() {
+            document.getElementById('exerciseModal').style.display = 'none';
+        }
+
+        // モーダル外クリックで閉じる
+        document.addEventListener('click', function(event) {
+            const modal = document.getElementById('exerciseModal');
+            if (event.target === modal) {
+                closeExerciseModal();
+            }
+        });
+
+        // 種目管理画面を描画
+        function renderExercisesManagement() {
+            const container = document.getElementById('exercises-list');
+            
+            if (exercises.length === 0) {
+                container.innerHTML = '<div class="empty">運動種目がありません</div>';
+                return;
+            }
+            
+            container.innerHTML = exercises.map(exercise => `
+                <div class="management-item">
+                    <div class="exercise-name" style="flex: 1;">${exercise.name}</div>
+                    <div class="exercise-actions">
+                        <button class="exercise-info" onclick="showExerciseInfo(${exercise.id})" title="詳細を見る">i</button>
+                        <button class="exercise-edit" onclick="editExercise(${exercise.id})" title="編集">✎</button>
+                        <button class="exercise-delete" onclick="deleteExercise(${exercise.id})" title="削除">×</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 新規運動追加モーダルを開く
+        function openAddExerciseModal() {
+            editingExerciseId = null;
+            document.getElementById('formModalTitle').textContent = '新しい運動を追加';
+            document.getElementById('exerciseForm').reset();
+            document.getElementById('exerciseFormModal').style.display = 'block';
+        }
+
+        // 運動編集モーダルを開く
+        function editExercise(exerciseId) {
+            const exercise = exercises.find(ex => ex.id === exerciseId);
+            if (!exercise) return;
+            
+            editingExerciseId = exerciseId;
+            document.getElementById('formModalTitle').textContent = '運動を編集';
+            
+            document.getElementById('exerciseName').value = exercise.name || '';
+            document.getElementById('exerciseDescription').value = exercise.description || '';
+            document.getElementById('exerciseSteps').value = exercise.steps || '';
+            document.getElementById('exerciseVideoUrl').value = exercise.video_url || '';
+            
+            document.getElementById('exerciseFormModal').style.display = 'block';
+        }
+
+        // 運動フォームモーダルを閉じる
+        function closeExerciseFormModal() {
+            document.getElementById('exerciseFormModal').style.display = 'none';
+            editingExerciseId = null;
+        }
+
+        // 運動を保存
+        async function saveExercise(event) {
+            event.preventDefault();
+            
+            const name = document.getElementById('exerciseName').value.trim();
+            const description = document.getElementById('exerciseDescription').value.trim();
+            const steps = document.getElementById('exerciseSteps').value.trim();
+            const videoUrl = document.getElementById('exerciseVideoUrl').value.trim();
+            
+            if (!name) {
+                alert('運動名を入力してください');
+                return;
+            }
+            
+            try {
+                const exerciseData = {
+                    user_id: userId,
+                    name: name,
+                    description: description,
+                    steps: steps,
+                    video_url: videoUrl,
+                    order_index: editingExerciseId ? undefined : exercises.length + 1
+                };
+                
+                let result;
+                if (editingExerciseId) {
+                    // 更新
+                    result = await supabase
+                        .from('exercises')
+                        .update(exerciseData)
+                        .eq('id', editingExerciseId)
+                        .eq('user_id', userId)
+                        .select();
+                } else {
+                    // 新規作成
+                    result = await supabase
+                        .from('exercises')
+                        .insert(exerciseData)
+                        .select();
+                }
+                
+                if (result.error) {
+                    console.error('運動保存エラー:', result.error);
+                    alert('保存に失敗しました');
+                    return;
+                }
+                
+                // データを再読み込み
+                await loadData();
+                
+                // モーダルを閉じる
+                closeExerciseFormModal();
+                
+                console.log('運動保存成功:', result.data);
+                
+            } catch (error) {
+                console.error('運動保存エラー:', error);
+                alert('保存に失敗しました');
+            }
+        }
+
+        // 運動を削除
+        async function deleteExercise(exerciseId) {
+            const exercise = exercises.find(ex => ex.id === exerciseId);
+            if (!exercise) return;
+            
+            if (!confirm(`「${exercise.name}」を削除しますか？\n関連するスケジュールや記録も削除されます。`)) {
+                return;
+            }
+            
+            try {
+                const { error } = await supabase
+                    .from('exercises')
+                    .delete()
+                    .eq('id', exerciseId)
+                    .eq('user_id', userId);
+                
+                if (error) {
+                    console.error('運動削除エラー:', error);
+                    alert('削除に失敗しました');
+                    return;
+                }
+                
+                // データを再読み込み
+                await loadData();
+                
+                console.log('運動削除成功:', exerciseId);
+                
+            } catch (error) {
+                console.error('運動削除エラー:', error);
+                alert('削除に失敗しました');
+            }
+        }
+
+        // スケジュール管理画面を描画
+        function renderScheduleManagement() {
+            const container = document.getElementById('schedule-management');
+            const dayNames = ['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'];
+            
+            container.innerHTML = dayNames.map((dayName, dayIndex) => {
+                const dayExercises = schedule[dayIndex] || [];
+                return `
+                    <div class="day-schedule">
+                        <div class="day-header">
+                            <div class="day-name">${dayName}</div>
+                            <button class="add-exercise-btn" onclick="openExerciseSelectModal(${dayIndex})">+ 追加</button>
+                        </div>
+                        <div class="day-exercises">
+                            ${dayExercises.length > 0 
+                                ? dayExercises.map(exercise => `
+                                    <div class="schedule-exercise">
+                                        <div class="schedule-exercise-name">${exercise.name}</div>
+                                        <button class="remove-exercise-btn" onclick="removeFromSchedule(${dayIndex}, ${exercise.id})" title="削除">×</button>
+                                    </div>
+                                `).join('')
+                                : '<div class="day-empty">運動が設定されていません</div>'
+                            }
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 運動選択モーダルを開く
+        function openExerciseSelectModal(dayOfWeek) {
+            selectedDayOfWeek = dayOfWeek;
+            const dayNames = ['日曜日', '月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日'];
+            document.getElementById('selectModalTitle').textContent = `${dayNames[dayOfWeek]}に追加する運動を選択`;
+            
+            // 既にスケジュールに入っている運動を除外
+            const scheduledExerciseIds = (schedule[dayOfWeek] || []).map(ex => ex.id);
+            const availableExercises = exercises.filter(ex => !scheduledExerciseIds.includes(ex.id));
+            
+            const container = document.getElementById('exercise-select-list');
+            if (availableExercises.length === 0) {
+                container.innerHTML = '<div class="empty">追加できる運動がありません</div>';
+            } else {
+                container.innerHTML = availableExercises.map(exercise => `
+                    <div class="exercise-item" onclick="addToSchedule(${dayOfWeek}, ${exercise.id})" style="cursor: pointer;">
+                        <div class="exercise-name">${exercise.name}</div>
+                    </div>
+                `).join('');
+            }
+            
+            document.getElementById('exerciseSelectModal').style.display = 'block';
+        }
+
+        // 運動選択モーダルを閉じる
+        function closeExerciseSelectModal() {
+            document.getElementById('exerciseSelectModal').style.display = 'none';
+            selectedDayOfWeek = null;
+        }
+
+        // スケジュールに運動を追加
+        async function addToSchedule(dayOfWeek, exerciseId) {
+            try {
+                const { error } = await supabase
+                    .from('schedules')
+                    .insert({
+                        user_id: userId,
+                        day_of_week: dayOfWeek,
+                        exercise_id: exerciseId
+                    });
+
+                if (error) {
+                    console.error('スケジュール追加エラー:', error);
+                    alert('追加に失敗しました');
+                    return;
+                }
+
+                // データを再読み込み
+                await loadData();
+                
+                // モーダルを閉じる
+                closeExerciseSelectModal();
+                
+                console.log('スケジュール追加成功:', dayOfWeek, exerciseId);
+                
+            } catch (error) {
+                console.error('スケジュール追加エラー:', error);
+                alert('追加に失敗しました');
+            }
+        }
+
+        // スケジュールから運動を削除
+        async function removeFromSchedule(dayOfWeek, exerciseId) {
+            try {
+                const { error } = await supabase
+                    .from('schedules')
+                    .delete()
+                    .eq('user_id', userId)
+                    .eq('day_of_week', dayOfWeek)
+                    .eq('exercise_id', exerciseId);
+
+                if (error) {
+                    console.error('スケジュール削除エラー:', error);
+                    alert('削除に失敗しました');
+                    return;
+                }
+
+                // データを再読み込み
+                await loadData();
+                
+                console.log('スケジュール削除成功:', dayOfWeek, exerciseId);
+                
+            } catch (error) {
+                console.error('スケジュール削除エラー:', error);
+                alert('削除に失敗しました');
+            }
+        }
+
+        // 履歴データを読み込み
+        async function loadHistoryData() {
+            try {
+                // 今月の統計を計算
+                await calculateMonthlyStats();
+                
+                // 最近の記録を取得
+                await loadRecentRecords();
+                
+                // 画面を更新
+                renderHistoryView();
+                
+            } catch (error) {
+                console.error('履歴データ読み込みエラー:', error);
+            }
+        }
+
+        // 今月の統計を計算
+        async function calculateMonthlyStats() {
+            const today = new Date();
+            const currentMonth = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0');
+            
+            try {
+                // 今月の記録を取得
+                const { data: monthRecords, error } = await supabase
+                    .from('exercise_records')
+                    .select('*, exercises(*)')
+                    .eq('user_id', userId)
+                    .gte('record_date', currentMonth + '-01')
+                    .lt('record_date', getNextMonth(currentMonth) + '-01');
+
+                if (error) {
+                    console.error('月間記録取得エラー:', error);
+                    return;
+                }
+
+                // 今月の予定日数を計算（各運動がスケジュールされている日数）
+                const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+                const currentDate = today.getDate();
+                
+                monthlyStats = {};
+                
+                exercises.forEach(exercise => {
+                    const scheduledDays = [];
+                    
+                    // この運動がスケジュールされている曜日を取得
+                    for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek++) {
+                        if (schedule[dayOfWeek] && schedule[dayOfWeek].some(ex => ex.id === exercise.id)) {
+                            scheduledDays.push(dayOfWeek);
+                        }
+                    }
+                    
+                    // 今月の予定日数を計算
+                    let scheduledCount = 0;
+                    for (let day = 1; day <= Math.min(daysInMonth, currentDate); day++) {
+                        const date = new Date(today.getFullYear(), today.getMonth(), day);
+                        if (scheduledDays.includes(date.getDay())) {
+                            scheduledCount++;
+                        }
+                    }
+                    
+                    // 実施回数を計算
+                    const completedCount = monthRecords?.filter(record => 
+                        record.exercise_id === exercise.id && record.completed
+                    ).length || 0;
+                    
+                    // 実施率を計算
+                    const rate = scheduledCount > 0 ? Math.round((completedCount / scheduledCount) * 100) : 0;
+                    
+                    monthlyStats[exercise.id] = {
+                        name: exercise.name,
+                        scheduled: scheduledCount,
+                        completed: completedCount,
+                        rate: rate
+                    };
+                });
+                
+            } catch (error) {
+                console.error('月間統計計算エラー:', error);
+            }
+        }
+
+        // 最近の記録を取得
+        async function loadRecentRecords() {
+            try {
+                const { data, error } = await supabase
+                    .from('exercise_records')
+                    .select('*, exercises(*)')
+                    .eq('user_id', userId)
+                    .eq('completed', true)
+                    .order('record_date', { ascending: false })
+                    .limit(10);
+
+                if (error) {
+                    console.error('最近の記録取得エラー:', error);
+                    return;
+                }
+
+                // 日付ごとにグループ化
+                const groupedRecords = {};
+                data?.forEach(record => {
+                    const date = record.record_date;
+                    if (!groupedRecords[date]) {
+                        groupedRecords[date] = [];
+                    }
+                    groupedRecords[date].push(record.exercises.name);
+                });
+
+                recentRecords = Object.entries(groupedRecords).map(([date, exercises]) => ({
+                    date: date,
+                    exercises: exercises,
+                    count: exercises.length
+                }));
+                
+            } catch (error) {
+                console.error('最近の記録取得エラー:', error);
+            }
+        }
+
+        // 履歴画面を描画
+        function renderHistoryView() {
+            // 月間統計を描画
+            const statsContainer = document.getElementById('monthly-stats');
+            if (Object.keys(monthlyStats).length === 0) {
+                statsContainer.innerHTML = '<div class="empty">統計データがありません</div>';
+            } else {
+                statsContainer.innerHTML = Object.values(monthlyStats).map(stat => `
+                    <div class="stat-card">
+                        <div class="stat-exercise-name">${stat.name}</div>
+                        <div class="stat-progress">
+                            <div class="stat-bar">
+                                <div class="stat-bar-fill" style="width: ${stat.rate}%">${stat.rate}%</div>
+                            </div>
+                        </div>
+                        <div class="stat-text">${stat.completed}/${stat.scheduled} 回実施</div>
+                    </div>
+                `).join('');
+            }
+
+            // 最近の記録を描画
+            const recordsContainer = document.getElementById('recent-records');
+            if (recentRecords.length === 0) {
+                recordsContainer.innerHTML = '<div class="empty">記録がありません</div>';
+            } else {
+                recordsContainer.innerHTML = recentRecords.map(record => `
+                    <div class="record-item">
+                        <div>
+                            <div class="record-date">${formatRecordDate(record.date)}</div>
+                            <div class="record-exercises">${record.exercises.join(', ')}</div>
+                        </div>
+                        <div class="record-count">${record.count}</div>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // 記録日付をフォーマット
+        function formatRecordDate(dateString) {
+            const date = new Date(dateString);
+            const today = new Date();
+            const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+            
+            if (dateString === today.toISOString().split('T')[0]) {
+                return '今日';
+            } else if (dateString === yesterday.toISOString().split('T')[0]) {
+                return '昨日';
+            } else {
+                return `${date.getMonth() + 1}/${date.getDate()}`;
+            }
+        }
+
+        // 次月を取得
+        function getNextMonth(currentMonth) {
+            const [year, month] = currentMonth.split('-').map(Number);
+            if (month === 12) {
+                return (year + 1) + '-01';
+            } else {
+                return year + '-' + String(month + 1).padStart(2, '0');
+            }
+        }
+
+        // 初期化
+        async function init() {
+            console.log('初期化開始');
+            
+            if (supabase) {
+                await initializeUserData();
+                await loadData();
+            } else {
+                console.warn('Supabaseが利用できません。オフラインモードで動作します。');
+                // オフライン用のダミーデータ表示
+                const today = new Date();
+                const { dateString, weekday } = formatDate(today);
+                document.getElementById('current-date').textContent = dateString;
+                document.getElementById('current-weekday').textContent = weekday;
+            }
+            
+            console.log('初期化完了');
+        }
+
+        // DOM読み込み完了時
+        document.addEventListener('DOMContentLoaded', init);
+
+        // フォーム送信イベント
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('exerciseForm').addEventListener('submit', saveExercise);
+            
+            // モーダル外クリックで閉じる（フォームモーダル）
+            document.addEventListener('click', function(event) {
+                const formModal = document.getElementById('exerciseFormModal');
+                const selectModal = document.getElementById('exerciseSelectModal');
+                
+                if (event.target === formModal) {
+                    closeExerciseFormModal();
+                } else if (event.target === selectModal) {
+                    closeExerciseSelectModal();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
