@@ -232,7 +232,7 @@
         console.log('ToDoアプリ ver.2025.1.25 開始');
         
         // Supabase設定
-        let supabase = null;
+        let supabaseClient = null;
         let currentUser = null;
         
         try {
@@ -240,11 +240,11 @@
             const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRxcHh1bndrZ3lyaGRiam5kamljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0MjUwODQsImV4cCI6MjA4NTAwMTA4NH0.83CaYShv6YyL0nLVSYHWw84j0TFuvsPTkeH3hQxS-Fw';
             
             if (window.supabase && window.supabase.createClient && SUPABASE_URL && SUPABASE_ANON_KEY) {
-                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
                 console.log('Supabase初期化成功');
                 
                 // 認証状態の監視
-                supabase.auth.onAuthStateChange((event, session) => {
+                supabaseClient.auth.onAuthStateChange((event, session) => {
                     currentUser = session?.user || null;
                     if (currentUser) {
                         userId = currentUser.id;
@@ -257,7 +257,7 @@
                 });
                 
                 // 初期認証確認
-                supabase.auth.getSession().then(({ data: { session } }) => {
+                supabaseClient.auth.getSession().then(({ data: { session } }) => {
                     currentUser = session?.user || null;
                     if (currentUser) {
                         userId = currentUser.id;
@@ -277,7 +277,7 @@
         
         // 匿名ログイン
         async function signInAnonymously() {
-            if (!supabase) return;
+            if (!supabaseClient) return;
             
             try {
                 // 既存の匿名セッションがあるかチェック
@@ -345,7 +345,7 @@
         
         function updateDebugInfo() {
             document.getElementById('debugUserId').textContent = userId || '-';
-            document.getElementById('debugSupabase').textContent = supabase ? '✓接続' : '✗未接続';
+            document.getElementById('debugSupabase').textContent = supabaseClient ? '✓接続' : '✗未接続';
             document.getElementById('debugLocalTasks').textContent = tasks.length;
             document.getElementById('debugPendingSync').textContent = pendingSync.size;
             document.getElementById('debugLastSync').textContent = new Date().toLocaleTimeString();
@@ -427,9 +427,9 @@
                 }
 
                 // Supabaseが利用可能な場合のみクラウド同期
-                if (supabase) {
+                if (supabaseClient) {
                     console.log('Supabaseからデータを取得中...');
-                    const { data, error } = await supabase
+                    const { data, error } = await supabaseClient
                         .from('tasks')
                         .select('*')
                         .eq('user_id', userId)
@@ -523,7 +523,7 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
                 return;
             }
             
-            if (!supabase) {
+            if (!supabaseClient) {
                 localStorage.setItem('taskflow_tasks_' + userId, JSON.stringify(tasks));
                 pendingSync.clear();
                 showSyncIndicator('ローカル保存のみ', false, false, true);
@@ -550,7 +550,7 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
 
                 if (updates.length > 0) {
                     console.log('Supabaseに同期中:', updates.length, '件');
-                    const { error } = await supabase
+                    const { error } = await supabaseClient
                         .from('tasks')
                         .upsert(updates, { onConflict: 'id' });
 
@@ -696,9 +696,9 @@ FOR ALL USING (user_id = auth.uid()::text OR user_id LIKE 'anon_%');
             tasks = tasks.filter(t => t.id !== id);
             renderTasks();
 
-            if (supabase) {
+            if (supabaseClient) {
                 try {
-                    const { error } = await supabase
+                    const { error } = await supabaseClient
                         .from('tasks')
                         .delete()
                         .eq('id', id)
